@@ -34,15 +34,15 @@ void argolib_init(int argc, char **argv) {
   if (mode == 0) {
     printf("Starting with Mode: RAND_WS\n");
     /* Create pools */
-    create_pools_2(streams, pools);
-    /* Create schedulers */
-    create_scheds_2(streams, pools, scheds);
-  } else if (mode == 1) {
-    printf("Starting with Mode: PRIVATE_DQ_RAND_WS\n");
-    /* Create pools */
     create_pools_1(streams, pools);
     /* Create schedulers */
     create_scheds_1(streams, pools, scheds);
+  } else if (mode == 1) {
+    printf("Starting with Mode: PRIVATE_DQ_RAND_WS\n");
+    /* Create pools */
+    create_pools_2(streams, pools);
+    /* Create schedulers */
+    create_scheds_2(streams, pools, scheds);
   } else {
     printf("Incorrect mode\n");
     assert(0);
