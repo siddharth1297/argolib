@@ -30,7 +30,7 @@ typedef struct {
 } argolib_task_t;
 
 /*
- * Copied from:
+ * Reffered from:
  * https://github.com/habanero-rice/hclib/blob/master/inc/hclib-async.h#L64 At
  * the lowest layer in the call stack before entering user code, this method
  * invokes the user-provided lambda.
@@ -41,7 +41,7 @@ template <typename T> inline void call_lambda(T *lambda) {
 }
 
 /*
- * Copied from:
+ * Reffered from:
  * https://github.com/habanero-rice/hclib/blob/master/inc/hclib-async.h#L100
  * Store a reference to the type-specific function for calling the user lambda,
  * as well as a pointer to the lambda's location on the heap (through which we
@@ -55,7 +55,7 @@ template <typename Function, typename T1> struct async_arguments {
 };
 
 /*
- * Copied from:
+ * Reffered from:
  * https://github.com/habanero-rice/hclib/blob/master/inc/hclib-async.h#L114 The
  * method called directly from the HC runtime, passed a pointer to an
  * async_arguments object. It then uses these async_arguments to call
@@ -67,7 +67,7 @@ template <typename Function, typename T1> void lambda_wrapper(void *args) {
 }
 
 /*
- * Copied from:
+ * Reffered from:
  * https://github.com/habanero-rice/hclib/blob/master/inc/hclib-async.h#L125
  * Initialize a task_t for the C++ APIs, using a user-provided lambda.
  */
