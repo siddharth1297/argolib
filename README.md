@@ -24,4 +24,4 @@ export ARGOLIB_WORKERS=2
     Remove commented code.: Done
     Structure code.
     Add documentations.
-    Check if working in other directories.
+    Check if working in other directories.: Done

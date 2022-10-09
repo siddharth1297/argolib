@@ -149,18 +149,15 @@ ABT_thread pool_pop_2(ABT_pool pool, ABT_pool_context tail) {
     if (p_pool->p_head == NULL) {
 
       return ABT_THREAD_NULL;
-
     }
 
-    else if (p_pool->p_head == p_pool->p_tail) {
+    if (p_pool->p_head == p_pool->p_tail) {
       // Only one thread.
 
       p_unit = p_pool->p_head;
       p_pool->p_head = NULL;
       p_pool->p_tail = NULL;
-    }
-
-    else {
+    } else {
       // Pop from the head.
 
       p_unit = p_pool->p_tail;
@@ -174,12 +171,10 @@ ABT_thread pool_pop_2(ABT_pool pool, ABT_pool_context tail) {
       return ABT_THREAD_NULL;
     }
 
-    else {
-      // Pop from the head.
+    // Pop from the head.
 
-      p_unit = p_pool->p_head;
-      p_pool->p_head = p_unit->p_prev;
-    }
+    p_unit = p_pool->p_head;
+    p_pool->p_head = p_unit->p_prev;
   }
 
   //  if(p_pool->id==0)
@@ -533,7 +528,7 @@ ABT_thread pool_pop_1(ABT_pool pool, ABT_pool_context tail) {
     if (p_pool->p_head == NULL)
       return ABT_THREAD_NULL;
 
-    else if (p_pool->p_head == p_pool->p_tail) {
+    if (p_pool->p_head == p_pool->p_tail) {
       // Only one thread.
       p_unit = p_pool->p_head;
       p_pool->p_head = NULL;
@@ -544,20 +539,16 @@ ABT_thread pool_pop_1(ABT_pool pool, ABT_pool_context tail) {
       p_pool->p_tail = p_unit->p_next;
     }
 
-  }
-
-  else {
+  } else {
 
     pthread_mutex_lock(&p_pool->lock);
 
     if (p_pool->p_head == NULL)
       return ABT_THREAD_NULL;
 
-    else {
-      // Pop from the head.
-      p_unit = p_pool->p_head;
-      p_pool->p_head = p_unit->p_prev;
-    }
+    // Pop from the head.
+    p_unit = p_pool->p_head;
+    p_pool->p_head = p_unit->p_prev;
 
     pthread_mutex_unlock(&p_pool->lock);
   }
