@@ -25,3 +25,6 @@ export ARGOLIB_WORKERS=2
     Structure code.
     Add documentations.
     Check if working in other directories.: Done
+    
+### Paper reffered to remove overhead
+https://hal.inria.fr/hal-00863028/document
