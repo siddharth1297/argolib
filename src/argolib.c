@@ -120,7 +120,7 @@ void argolib_join(Task_handle **list, int size) {
 
 ABT_unit pool_create_unit_2(ABT_pool pool, ABT_thread thread) {
 
-  unit_tt *p_unit = (unit_tt *)calloc(1, sizeof(unit_tt));
+  unit_t *p_unit = (unit_t *)calloc(1, sizeof(unit_t));
   if (!p_unit)
     return ABT_UNIT_NULL;
   p_unit->thread = thread;
@@ -128,21 +128,21 @@ ABT_unit pool_create_unit_2(ABT_pool pool, ABT_thread thread) {
 }
 
 void pool_free_unit_2(ABT_pool pool, ABT_unit unit) {
-  unit_tt *p_unit = (unit_tt *)unit;
+  unit_t *p_unit = (unit_t *)unit;
   free(unit);
 }
 
 ABT_bool pool_is_empty_2(ABT_pool pool) {
-  pool_overhead *p_pool;
+  pool_overhead_t *p_pool;
   ABT_pool_get_data(pool, (void **)&p_pool);
   return p_pool->p_head ? ABT_FALSE : ABT_TRUE;
 }
 
 ABT_thread pool_pop_2(ABT_pool pool, ABT_pool_context tail) {
 
-  pool_overhead *p_pool;
+  pool_overhead_t *p_pool;
   ABT_pool_get_data(pool, (void **)&p_pool);
-  unit_tt *p_unit = NULL;
+  unit_t *p_unit = NULL;
 
   if (!(tail & ABT_POOL_CONTEXT_OWNER_SECONDARY)) {
 
@@ -192,9 +192,9 @@ ABT_thread pool_pop_2(ABT_pool pool, ABT_pool_context tail) {
 }
 
 void pool_push_2(ABT_pool pool, ABT_unit unit, ABT_pool_context c) {
-  pool_overhead *p_pool;
+  pool_overhead_t *p_pool;
   ABT_pool_get_data(pool, (void **)&p_pool);
-  unit_tt *p_unit = (unit_tt *)unit;
+  unit_t *p_unit = (unit_t *)unit;
   // printf("pool id%d\n",p_pool->id);
 
   if (p_pool->p_tail) {
@@ -211,8 +211,9 @@ void pool_push_2(ABT_pool pool, ABT_unit unit, ABT_pool_context c) {
 
 int pool_init_2(ABT_pool pool, ABT_pool_config config) {
 
-  pool_overhead *p_pool = (pool_overhead *)calloc(1, sizeof(pool_overhead));
-  p_pool->rb = (request_box *)calloc(1, sizeof(request_box));
+  pool_overhead_t *p_pool =
+      (pool_overhead_t *)calloc(1, sizeof(pool_overhead_t));
+  p_pool->rb = (request_box_t *)calloc(1, sizeof(request_box_t));
 
   if (!p_pool)
     return ABT_ERR_MEM;
@@ -236,7 +237,7 @@ int pool_init_2(ABT_pool pool, ABT_pool_config config) {
 }
 
 void pool_free_2(ABT_pool pool) {
-  pool_overhead *p_pool;
+  pool_overhead_t *p_pool;
   ABT_pool_get_data(pool, (void **)&p_pool);
   pthread_mutex_destroy(&p_pool->rb->lock);
   pthread_cond_destroy(&p_pool->rb->cond);
@@ -271,7 +272,7 @@ void create_pools_2(int num, ABT_pool *pools) {
 
 int sched_init_2(ABT_sched sched, ABT_sched_config config) {
 
-  sched_data_tt *p_data = (sched_data_tt *)calloc(1, sizeof(sched_data_tt));
+  sched_data_t *p_data = (sched_data_t *)calloc(1, sizeof(sched_data_t));
 
   ABT_sched_config_read(config, 1, &p_data->event_freq);
   ABT_sched_set_data(sched, (void *)p_data);
@@ -282,11 +283,11 @@ int sched_init_2(ABT_sched sched, ABT_sched_config config) {
 void sched_run_2(ABT_sched sched) {
 
   int work_count = 0;
-  sched_data_tt *p_data;
+  sched_data_t *p_data;
   ABT_pool *pool;
   int target_pool;
   ABT_bool stop;
-  pool_overhead *p_pool;
+  pool_overhead_t *p_pool;
 
   ABT_sched_get_data(sched, (void **)&p_data);
   pool = (ABT_pool *)malloc(1 * sizeof(ABT_pool));
@@ -307,7 +308,7 @@ void sched_run_2(ABT_sched sched) {
       if (p_pool->rb->thief_id != -1) {
         //   printf("%d\n",p_pool->rb->thief_id);
         ABT_pool thief_pool;
-        pool_overhead *thief;
+        pool_overhead_t *thief;
         thief_pool = pools[p_pool->rb->thief_id];
         ABT_pool_get_data(thief_pool, (void **)&thief);
         int idx = 0;
@@ -337,7 +338,7 @@ void sched_run_2(ABT_sched sched) {
     } else {
       printf("while else\n");
       target_pool = rand() % streams;
-      pool_overhead *vic_pool;
+      pool_overhead_t *vic_pool;
       ABT_pool_get_data(pools[target_pool], (void **)&vic_pool);
 
       if (vic_pool->rb->thief_id != -1 || vic_pool->wu <= 1)
@@ -378,7 +379,7 @@ void sched_run_2(ABT_sched sched) {
 
 int sched_free_2(ABT_sched sched) {
 
-  sched_data_tt *p_data;
+  sched_data_t *p_data;
 
   ABT_sched_get_data(sched, (void **)&p_data);
   free(p_data);

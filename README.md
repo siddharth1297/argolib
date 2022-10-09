@@ -21,7 +21,7 @@ export ARGOLIB_WORKERS=2
 ```
 
 ## TODO:
-    Remove commented code.
+    Remove commented code.: Done
     Structure code.
     Add documentations.
     Check if working in other directories.
