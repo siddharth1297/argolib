@@ -5,14 +5,20 @@
 #define ARGOLIBDEFS_H
 
 #include <assert.h>
+#include <limits.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "abt.h"
 
 typedef ABT_thread Task_handle;
 typedef void (*fork_t)(void *args);
+
+typedef long counter_t;
+#define COUNTER_MIN LONG_MIN
+#define COUNTER_MAX LONG_MAX
 
 typedef struct unit_t unit_t;
 typedef struct pool_t pool_t;
@@ -48,5 +54,33 @@ typedef struct pool_overhead {
   unit_t *p_tail;
   int wu; // work units in the pool
 } pool_overhead_t;
+
+typedef struct tracereplay_unit_t tracereplay_unit_t;
+
+struct tracereplay_unit_t {
+  tracereplay_unit_t *p_prev;
+  tracereplay_unit_t *p_next;
+  ABT_thread thread;
+};
+
+typedef struct trace_data_t {
+  counter_t task_id;
+  int create_pool_idx;
+  int exec_pool_idx;
+  counter_t steal_count;
+} trace_data_t;
+
+typedef struct trace_task_list_t {
+  trace_data_t trace_data;
+  struct trace_task_list_t *prev;
+  struct trace_task_list_t *next;
+} trace_task_list_t;
+
+typedef struct tracereplay_pool_t {
+  pthread_mutex_t lock;
+  tracereplay_unit_t *p_head;
+  tracereplay_unit_t *p_tail;
+  trace_task_list_t *task_list;
+} tracereplay_pool_t;
 
 #endif

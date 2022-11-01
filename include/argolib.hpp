@@ -16,18 +16,20 @@ extern void argolib_init(int argc, char **argv);
 extern void argolib_finalize();
 extern void argolib_kernel(fork_t fptr, void *args);
 extern Task_handle *argolib_fork(fork_t fptr, void *args);
-void argolib_join(Task_handle **list, int size);
+extern void argolib_join(Task_handle **list, int size);
+extern void argolib_start_tracing();
+extern void argolib_stop_tracing();
 }
 
 namespace argolib {
 
 /*
- * argolib task structure
+ * argolib cpp task structure
  */
 typedef struct {
   void *args;
   fork_t _fp;
-} argolib_task_t;
+} argolib_cpp_task_t;
 
 /*
  * Reffered from:
@@ -72,9 +74,9 @@ template <typename Function, typename T1> void lambda_wrapper(void *args) {
  * Initialize a task_t for the C++ APIs, using a user-provided lambda.
  */
 template <typename Function, typename T1>
-inline argolib_task_t *initialize_task(Function lambda_caller,
-                                       T1 *lambda_on_heap) {
-  argolib_task_t *t = (argolib_task_t *)calloc(1, sizeof(*t));
+inline argolib_cpp_task_t *initialize_task(Function lambda_caller,
+                                           T1 *lambda_on_heap) {
+  argolib_cpp_task_t *t = (argolib_cpp_task_t *)calloc(1, sizeof(*t));
   assert(t && lambda_on_heap);
   async_arguments<Function, T1> *args =
       new async_arguments<Function, T1>(lambda_caller, lambda_on_heap);
@@ -99,7 +101,7 @@ void finalize() { argolib_finalize(); }
  * lambda_on_heap is expected to be off-stack storage for a lambda object
  * (including its captured variables), which will be pointed to from the task_t.
  */
-template <typename T> inline argolib_task_t *allocate_task(T *lambda) {
+template <typename T> inline argolib_cpp_task_t *allocate_task(T *lambda) {
   T *lambda_on_heap = (T *)malloc(sizeof(*lambda_on_heap));
   assert(lambda_on_heap);
   memcpy(lambda_on_heap, lambda, sizeof(*lambda_on_heap));
@@ -114,10 +116,15 @@ template <typename T> inline argolib_task_t *allocate_task(T *lambda) {
  */
 template <typename T> void kernel(T &&lambda) {
   typedef typename std::remove_reference<T>::type U;
-  argolib_task_t *task = allocate_task(new U(lambda));
+  // argolib_cpp_task_t *task = allocate_task(new U(lambda));
+  auto u = new U(lambda);
+  argolib_cpp_task_t *task = allocate_task(u);
   fork_t fptr = (fork_t)((task->_fp));
   void *args = task->args;
   argolib_kernel(fptr, args);
+  //free(args);
+  //free(task);
+  //delete u;
 }
 
 /**
@@ -126,10 +133,16 @@ template <typename T> void kernel(T &&lambda) {
  */
 template <typename T> Task_handle *fork(T &&lambda) {
   typedef typename std::remove_reference<T>::type U;
-  argolib_task_t *task = allocate_task(new U(lambda));
+  // argolib_cpp_task_t *task = allocate_task(new U(lambda));
+  auto u = new U(lambda);
+  argolib_cpp_task_t *task = allocate_task(u);
   fork_t fptr = (fork_t)((task->_fp));
   void *args = task->args;
-  return argolib_fork(fptr, args);
+  Task_handle *ret = argolib_fork(fptr, args);
+  //free(args);
+  //free(task);
+  //delete u;
+  return ret;
 }
 
 /*
@@ -157,6 +170,16 @@ template <typename... T> void join(T... handles) {
   // https://kevinushey.github.io/blog/2016/01/27/introduction-to-c++-variadic-templates/
   join_and_free(handles...);
 }
+
+/**
+ * C++ API for start tracing
+ */
+void start_tracing() { argolib_start_tracing(); }
+
+/**
+ * C++ API for stop tracing
+ */
+void stop_tracing() { argolib_stop_tracing(); }
 
 } // namespace argolib
 

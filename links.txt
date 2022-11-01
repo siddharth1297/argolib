@@ -1,0 +1,7 @@
+ES: https://www.argobots.org/doxygen/latest/d3/def/group__ES.html
+thread/ULT: https://www.argobots.org/doxygen/latest/d0/d6d/group__ULT.html
+thread attr: https://www.argobots.org/doxygen/latest/d2/df6/group__ULT__ATTR.html
+key: https://www.argobots.org/doxygen/latest/d0/d5e/group__KEY.html
+sched: https://www.argobots.org/doxygen/latest/d0/d83/group__SCHED.html
+pool: https://www.argobots.org/doxygen/latest/d9/d52/group__POOL.html
+unit: https://www.argobots.org/doxygen/latest/de/dab/group__UNIT.html
