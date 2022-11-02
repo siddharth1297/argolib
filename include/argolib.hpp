@@ -122,9 +122,9 @@ template <typename T> void kernel(T &&lambda) {
   fork_t fptr = (fork_t)((task->_fp));
   void *args = task->args;
   argolib_kernel(fptr, args);
-  //free(args);
-  //free(task);
-  //delete u;
+  // free(args);
+  // free(task);
+  // delete u;
 }
 
 /**
@@ -139,9 +139,9 @@ template <typename T> Task_handle *fork(T &&lambda) {
   fork_t fptr = (fork_t)((task->_fp));
   void *args = task->args;
   Task_handle *ret = argolib_fork(fptr, args);
-  //free(args);
-  //free(task);
-  //delete u;
+  // free(args);
+  // free(task);
+  // delete u;
   return ret;
 }
 

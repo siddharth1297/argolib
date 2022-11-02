@@ -23,7 +23,7 @@ ifneq (,$(findstring DEBUG,$(CFLAGS)))
 endif
 
 libargolib.so: argolib.c
-	gcc -std=c11 $(CFLAGS) -Werror -shared $(OP) -fPIC \
+	gcc -std=c11 $(CFLAGS) -Wall -Werror -shared $(OP) -fPIC \
 		-I../include -I${ARGOBOTS_INSTALL_DIR}/include \
 		-o ../lib/libargolib.so argolib.c
 format:

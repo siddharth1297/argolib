@@ -11,7 +11,7 @@ trace_task_list_t *create_trace_data_node(counter_t task_id,
                                           int exec_pool_idx,
                                           counter_t steal_count) {
   trace_task_list_t *node =
-      (trace_task_list_t *)malloc(sizeof(trace_task_list_t)); // TODO: Free
+      (trace_task_list_t *)malloc(sizeof(trace_task_list_t));
   assert(node != NULL);
   node->prev = NULL;
   node->next = NULL;
@@ -28,17 +28,23 @@ trace_task_list_t *create_trace_data_node(counter_t task_id,
 void add_to_trace_list(trace_task_list_t **list, trace_task_list_t *node) {
   if (*list == NULL) {
     *list = node;
+#ifdef DEBUG
     printf("LIST init %p:: {%ld\t%d\t%d\t%ld}\n", list,
            node->trace_data.task_id, node->trace_data.create_pool_idx,
            node->trace_data.exec_pool_idx, node->trace_data.steal_count);
+#endif
   } else {
-    trace_task_list_t *olsLst = *list; // TODO: Delete
+#ifdef DEBUG
+    // trace_task_list_t *olsLst = *list;
+#endif
     node->next = *list;
     (*list)->prev = node;
     *list = node;
-    printf("LIST updt %p -> %p:: {%ld\t%d\t%d\t%ld}\n", olsLst, list,
+#ifdef DEBUG
+    /*printf("LIST updt %p -> %p:: {%ld\t%d\t%d\t%ld}\n", olsLst, list,
            node->trace_data.task_id, node->trace_data.create_pool_idx,
-           node->trace_data.exec_pool_idx, node->trace_data.steal_count);
+           node->trace_data.exec_pool_idx, node->trace_data.steal_count);*/
+#endif
   }
 }
 
@@ -142,6 +148,7 @@ void freeList(trace_task_list_t *list) {
   while (list) {
     next = list->next;
     free(list);
+    list = next;
   }
 }
 #endif

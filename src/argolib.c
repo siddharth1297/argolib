@@ -237,7 +237,7 @@ ABT_unit pool_create_unit_2(ABT_pool pool, ABT_thread thread) {
 }
 
 void pool_free_unit_2(ABT_pool pool, ABT_unit unit) {
-  unit_t *p_unit = (unit_t *)unit;
+  // unit_t *p_unit = (unit_t *)unit;
   free(unit);
 }
 
@@ -392,7 +392,7 @@ void sched_run_2(ABT_sched sched) {
   sched_data_t *p_data;
   ABT_pool *pool;
   int target_pool;
-  ABT_bool stop;
+  // ABT_bool stop;
   pool_overhead_t *p_pool;
 
   ABT_sched_get_data(sched, (void **)&p_data);
@@ -497,7 +497,7 @@ void create_scheds_2(int num, ABT_pool *pools, ABT_sched *scheds) {
 
   ABT_sched_config config;
 
-  int i, k;
+  int i;
 
   ABT_sched_config_var cv_event_freq = {.idx = 0, .type = ABT_SCHED_CONFIG_INT};
   ABT_sched_def sched_def = {.type = ABT_SCHED_TYPE_ULT,
@@ -533,7 +533,7 @@ void sched_run_1(ABT_sched sched) {
   sched_data_t *p_data;
   ABT_pool *pool;
   int target_pool;
-  ABT_bool stop;
+  // ABT_bool stop;
 
   ABT_sched_get_data(sched, (void **)&p_data);
   pool = (ABT_pool *)malloc(1 * sizeof(ABT_pool));
@@ -590,7 +590,7 @@ void create_scheds_1(int num, ABT_pool *pools, ABT_sched *scheds) {
 
   ABT_sched_config config;
 
-  int i, k;
+  int i;
 
   ABT_sched_config_var cv_event_freq = {.idx = 0, .type = ABT_SCHED_CONFIG_INT};
   ABT_sched_def sched_def = {.type = ABT_SCHED_TYPE_ULT,
@@ -1138,7 +1138,7 @@ void create_scheds_3(int num, ABT_pool *pools, ABT_sched *scheds) {
 
   ABT_sched_config config;
 
-  int i, k;
+  int i;
 
   ABT_sched_config_var cv_event_freq = {.idx = 0, .type = ABT_SCHED_CONFIG_INT};
   ABT_sched_def sched_def = {.type = ABT_SCHED_TYPE_ULT,
