@@ -741,9 +741,9 @@ static void dump_trace_result(const char *filename, const char *mode,
   for (int i = 0; i < streams; i++) {
     tracereplay_pool_t *this_pool_data = NULL;
     ABT_pool_get_data(pools[i], (void **)&this_pool_data);
-    trace_task_list_t *task_list = this_pool_data->task_list, *p = task_list;
+    trace_task_list_t *task_list = this_pool_data->trace_task_list, *p = task_list;
     fprintf(fp, "\n-----Stream: %d -> %p %p-----\n", i,
-            this_pool_data->task_list, task_list);
+            this_pool_data->trace_task_list, task_list);
     printf("at stream %d \n", i);
     // GOTO last
     /*while (p && p->next) {
@@ -768,15 +768,15 @@ static void list_aggregation() {
   for (int i = 0; i < streams; i++) {
     tracereplay_pool_t *this_pool_data = NULL;
     ABT_pool_get_data(pools[i], (void **)&this_pool_data);
-    trace_task_list_t *curr = this_pool_data->task_list, *nxt = NULL;
+    trace_task_list_t *curr = this_pool_data->trace_task_list, *nxt = NULL;
     while (curr) {
       nxt = curr->next;
       if (curr->trace_data.create_pool_idx != curr->trace_data.exec_pool_idx) {
-        remove_node_from_trace_list(&(this_pool_data->task_list), curr);
+        remove_node_from_trace_list(&(this_pool_data->trace_task_list), curr);
         tracereplay_pool_t *source_pool_data = NULL;
         ABT_pool_get_data(pools[curr->trace_data.create_pool_idx],
                           (void **)&source_pool_data);
-        add_to_trace_list(&(source_pool_data->task_list), curr);
+        add_to_trace_list(&(source_pool_data->trace_task_list), curr);
       }
       curr = nxt;
     }
@@ -786,7 +786,7 @@ static void list_aggregation() {
   for (int i = 0; i < streams; i++) {
     tracereplay_pool_t *this_pool_data = NULL;
     ABT_pool_get_data(pools[i], (void **)&this_pool_data);
-    trace_task_list_t *curr = this_pool_data->task_list;
+    trace_task_list_t *curr = this_pool_data->trace_task_list;
     while (curr) {
       assert(curr->trace_data.create_pool_idx == i);
       curr = curr->next;
@@ -801,7 +801,7 @@ static void list_sorting() {
   for (int i = 0; i < streams; i++) {
     tracereplay_pool_t *this_pool_data = NULL;
     ABT_pool_get_data(pools[i], (void **)&this_pool_data);
-    insertionSort(&(this_pool_data->task_list));
+    insertionSort(&(this_pool_data->trace_task_list));
   }
   //#ifdef DEBUG TODO: Uncomment in live
   // Verify sort
@@ -809,7 +809,7 @@ static void list_sorting() {
     printf("Verifying stream %d\n", i);
     tracereplay_pool_t *this_pool_data = NULL;
     ABT_pool_get_data(pools[i], (void **)&this_pool_data);
-    trace_task_list_t *curr = this_pool_data->task_list;
+    trace_task_list_t *curr = this_pool_data->trace_task_list;
     counter_t lastVal = COUNTER_MIN;
     while (curr) {
       assert(lastVal < curr->trace_data.task_id);
@@ -1010,7 +1010,7 @@ void pool_free_3(ABT_pool pool) {
   tracereplay_pool_t *p_pool;
   ABT_pool_get_data(pool, (void **)&p_pool);
   pthread_mutex_destroy(&p_pool->lock);
-  freeList(p_pool->task_list);
+  freeList(p_pool->trace_task_list);
   free(p_pool);
 }
 
@@ -1101,7 +1101,7 @@ void sched_run_3(ABT_sched sched) {
                      vic_pool_idx, this_pool_idx, task_id, steal_count);
 #endif
               // DO the things
-              add_to_trace_list(&(this_pool_data->task_list),
+              add_to_trace_list(&(this_pool_data->trace_task_list),
                                 create_trace_data_node(task_id, vic_pool_idx,
                                                        this_pool_idx,
                                                        steal_count));

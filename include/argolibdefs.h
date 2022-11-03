@@ -80,7 +80,7 @@ typedef struct tracereplay_pool_t {
   pthread_mutex_t lock;
   tracereplay_unit_t *p_head;
   tracereplay_unit_t *p_tail;
-  trace_task_list_t *task_list;
+  trace_task_list_t *trace_task_list;
 } tracereplay_pool_t;
 
 #endif
