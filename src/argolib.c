@@ -145,7 +145,8 @@ Task_handle *argolib_fork(fork_t fptr, void *args) {
     assert(ABT_SUCCESS == ABT_thread_create(target_pool, fptr, args,
                                             ABT_THREAD_ATTR_NULL, child));
 #ifdef DEBUG
-    printf("Child Id: %ld pool: %d\n", get_task_id(*child), rank);
+    printf("Child Id: %ld pool: %d fptr: %p args: %p\n", get_task_id(*child),
+           rank, fptr, args);
 
     // printf("Sleep: pool: %d\n", rank);
     // printf("---------------------------\n");
@@ -741,7 +742,8 @@ static void dump_trace_result(const char *filename, const char *mode,
   for (int i = 0; i < streams; i++) {
     tracereplay_pool_t *this_pool_data = NULL;
     ABT_pool_get_data(pools[i], (void **)&this_pool_data);
-    trace_task_list_t *task_list = this_pool_data->trace_task_list, *p = task_list;
+    trace_task_list_t *task_list = this_pool_data->trace_task_list,
+                      *p = task_list;
     fprintf(fp, "\n-----Stream: %d -> %p %p-----\n", i,
             this_pool_data->trace_task_list, task_list);
     printf("at stream %d \n", i);
@@ -917,9 +919,10 @@ ABT_thread pool_pop_3(ABT_pool pool, ABT_pool_context tail) {
   tracereplay_pool_t *p_pool;
   ABT_pool_get_data(pool, (void **)&p_pool);
   tracereplay_unit_t *p_unit = NULL;
+  int own_pool = !(tail == ABT_POOL_CONTEXT_OWNER_SECONDARY);
 
   // TODO: Fix this part
-  if (!(tail & ABT_POOL_CONTEXT_OWNER_SECONDARY)) {
+  if (own_pool) {
     // thread is accessing its own pool
     if (p_pool->p_head == NULL) {
       return ABT_THREAD_NULL;
@@ -957,8 +960,8 @@ ABT_thread pool_pop_3(ABT_pool pool, ABT_pool_context tail) {
   if (!p_unit)
     return ABT_THREAD_NULL;
 #ifdef DEBUG
-  printf("Popped Id: %ld pool: %d\n", get_task_id(p_unit->thread),
-         get_user_pool_rank(pool));
+  printf("Popped Id: %ld pool: %d own_pool: %d\n", get_task_id(p_unit->thread),
+         get_user_pool_rank(pool), own_pool);
 #endif
   return p_unit->thread;
 }
@@ -973,15 +976,15 @@ void pool_push_3(ABT_pool pool, ABT_unit unit, ABT_pool_context c) {
   pthread_mutex_lock(&p_pool->lock);
   if (p_pool->p_tail) {
 #ifdef DEBUG
-    printf("Pushed(none) Id: %ld pool: %d\n", get_task_id(p_unit->thread),
-           get_user_pool_rank(pool));
+    printf("Pushed(none) Id: %ld pool: %d CTXT: %ld\n",
+           get_task_id(p_unit->thread), get_user_pool_rank(pool), c);
 #endif
     p_unit->p_next = p_pool->p_tail;
     p_pool->p_tail->p_prev = p_unit;
   } else {
 #ifdef DEBUG
-    printf("Pushed(empt) Id: %ld pool: %d\n", get_task_id(p_unit->thread),
-           get_user_pool_rank(pool));
+    printf("Pushed(empt) Id: %ld pool: %d CTXT: %ld\n",
+           get_task_id(p_unit->thread), get_user_pool_rank(pool), c);
 #endif
     p_pool->p_head = p_unit;
   }
@@ -1072,12 +1075,11 @@ void sched_run_3(ABT_sched sched) {
       assert(0);
     } else {
       ABT_thread thread = NULL;
-      ABT_unit unit;
+      // ABT_unit unit;
 
       // Pop from own pool
-      assert(ABT_pool_pop(pool[0], &unit) == ABT_SUCCESS);
-      int thread_stat = ABT_unit_get_thread(unit, &thread);
-      if (thread_stat == ABT_SUCCESS && thread != ABT_THREAD_NULL) {
+      int thred_pop_stat = ABT_pool_pop_thread(pool[0], &thread);
+      if (thred_pop_stat == ABT_SUCCESS && thread != ABT_THREAD_NULL) {
         counter_t task_id = get_task_id(thread);
 #ifdef DEBUG
         printf("Got(Own) pool: %d, taskId: %ld\n", this_pool_idx, task_id);
@@ -1085,29 +1087,26 @@ void sched_run_3(ABT_sched sched) {
         ABT_self_schedule(thread, pool[0]);
       } else {
         // Steal from victim pool TODO: what if it choose itself ?
-        // vic_pool_idx = 0;
         vic_pool_idx = rand() % streams;
         if (vic_pool_idx != this_pool_idx) {
-          int pool_pop_res = ABT_pool_pop(pools[vic_pool_idx], &unit);
-
-          if (pool_pop_res == ABT_SUCCESS) {
-            int thread_stat = ABT_unit_get_thread(unit, &thread);
-            if (thread_stat == ABT_SUCCESS && thread != ABT_THREAD_NULL) {
-              counter_t task_id = get_task_id(thread);
-              counter_t steal_count = (steal_counter[this_pool_idx])++;
+          if ((ABT_pool_pop_thread_ex(pools[vic_pool_idx], &thread,
+                                      ABT_POOL_CONTEXT_OWNER_SECONDARY) ==
+               ABT_SUCCESS) &&
+              (thread != ABT_THREAD_NULL)) {
+            counter_t task_id = get_task_id(thread);
+            counter_t steal_count = (steal_counter[this_pool_idx])++;
 #ifdef DEBUG
-              printf("Got(Stole) pool(vic): %d pool(own): %d taskId: %ld "
-                     "stealCnt: %ld\n",
-                     vic_pool_idx, this_pool_idx, task_id, steal_count);
+            printf("Got(Stole) pool(vic): %d pool(own): %d taskId: %ld "
+                   "stealCnt: %ld\n",
+                   vic_pool_idx, this_pool_idx, task_id, steal_count);
 #endif
-              // DO the things
-              add_to_trace_list(&(this_pool_data->trace_task_list),
-                                create_trace_data_node(task_id, vic_pool_idx,
-                                                       this_pool_idx,
-                                                       steal_count));
-              // Don't do shelf_schedule. It will again update id
-              ABT_pool_push(pool[0], unit); // Push in its own pool
-            }
+            // DO the things
+            add_to_trace_list(&(this_pool_data->trace_task_list),
+                              create_trace_data_node(task_id, vic_pool_idx,
+                                                     this_pool_idx,
+                                                     steal_count));
+            // Don't do shelf_schedule. It will again update id
+            ABT_pool_push_thread(pool[0], thread); // Push in its own pool
           }
         }
       }
@@ -1122,6 +1121,9 @@ void sched_run_3(ABT_sched sched) {
     }
   }
   free(pool);
+#ifdef DEBUG
+  printf("Exiting %s sched: %p\n", __FUNCTION__, sched);
+#endif
 }
 
 int sched_free_3(ABT_sched sched) {
