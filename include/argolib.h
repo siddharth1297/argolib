@@ -20,6 +20,7 @@ static int replay_enabled = 0;
 static counter_t *async_counter = NULL;
 static counter_t *steal_counter = NULL;
 static ABT_key *keys = NULL;
+static FILE *logger = NULL;
 
 /**
  * Initializes the ArgoLib runtime, and it should be the first thing to call in

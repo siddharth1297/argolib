@@ -58,6 +58,7 @@ void runParallel() {
     myNew = myVal;
     myVal = temp;
     argolib::stop_tracing();
+    if(i == 1) // Comment if want only trace but no replay
     break;
   }
 }

@@ -13,8 +13,8 @@ CFLAGS+=-DDEBUG
 OP=-O3
 
 ifneq (,$(findstring DEBUG,$(CFLAGS)))
-        OP=-ggdb
-        #OP=-ggdb -O0
+        #OP=-ggdb
+        OP=-ggdb -O0
 endif
 
 %: %.c
