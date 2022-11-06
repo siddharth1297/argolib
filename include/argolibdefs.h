@@ -77,7 +77,11 @@ typedef struct trace_task_list_t {
 } trace_task_list_t;
 
 typedef struct replay_data_t {
-  ABT_thread thread;
+  //ABT_thread thread;
+  counter_t task_id;
+  fork_t fptr;
+  void *args;
+  int available;
 } replay_data_t;
 
 typedef struct tracereplay_pool_t {
@@ -85,9 +89,11 @@ typedef struct tracereplay_pool_t {
   tracereplay_unit_t *p_head;
   tracereplay_unit_t *p_tail;
   trace_task_list_t *trace_task_list;
-  counter_t total_steals;
   replay_data_t *replay_data_arr;
   trace_task_list_t *replay_curr_task_ptr;
+  counter_t async_counter;
+  counter_t steal_counter;
+  counter_t total_steals;
 } tracereplay_pool_t;
 
 #endif

@@ -54,10 +54,10 @@ void runParallel() {
   for (int i = 0; i < ITERATIONS; i++) {
     argolib::start_tracing();
     recurse(1, SIZE + 1);
+    argolib::stop_tracing();
     double *temp = myNew;
     myNew = myVal;
     myVal = temp;
-    argolib::stop_tracing();
     if(i == 1) // Comment if want only trace but no replay
     break;
   }

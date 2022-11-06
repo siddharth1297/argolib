@@ -17,10 +17,13 @@ static int mode =
     -1; // 0 for normal RAND_WS, 1 for private deque RAND_WS, 2 for TRACE_REPLAY
 static int tracing_enabled = 0;
 static int replay_enabled = 0;
-static counter_t *async_counter = NULL;
-static counter_t *steal_counter = NULL;
 static ABT_key *keys = NULL;
 static FILE *logger = NULL;
+
+static int tr_sync_wait_on_cond_var = 0;
+static pthread_mutex_t tr_sync_mtx;
+static int tr_sync_n_wait_cond_var = 0; // Take the above lock before writing
+static pthread_cond_t tr_sync_cond;
 
 /**
  * Initializes the ArgoLib runtime, and it should be the first thing to call in
