@@ -14,7 +14,8 @@ static void list_sorting();
 static void create_stolen_task_container();
 static void reset_counters();
 static int is_stolen_task(ABT_pool pool, counter_t task_id);
-static void copy_stolen_task(ABT_pool pool, fork_t fptr, void *args, counter_t task_id);
+static void copy_stolen_task(ABT_pool pool, fork_t fptr, void *args,
+                             counter_t task_id, ABT_thread *child);
 
 void argolib_init(int argc, char **argv) {
   // logger = fopen("log_trace.tmp", "w+");
@@ -143,22 +144,29 @@ Task_handle *argolib_fork(fork_t fptr, void *args) {
 
 #ifdef TRACE_REPLAY
   if (replay_enabled) {
-	  tracereplay_pool_t *p_pool = NULL;
-	  ABT_pool_get_data(target_pool, (void **)&p_pool);
-	  if(is_stolen_task(target_pool, (p_pool->async_counter) + 1)) {
-  		(p_pool->async_counter)++;
-		copy_stolen_task(target_pool, fptr, args, p_pool->async_counter);
-		return NULL;
-	} else {
-    assert(ABT_SUCCESS == ABT_thread_create(target_pool, fptr, args,
-                                            ABT_THREAD_ATTR_NULL, child));
-	}
+    tracereplay_pool_t *p_pool = NULL;
+    ABT_pool_get_data(target_pool, (void **)&p_pool);
+    if (is_stolen_task(target_pool, (p_pool->async_counter) + 1)) {
+      (p_pool->async_counter)++;
+      copy_stolen_task(target_pool, fptr, args, p_pool->async_counter, child);
+#ifdef DEBUG
+      fprintf(logger, "ChildR(Cop) pool: %d fptr: %p args: %p Ptr: %p\n", rank,
+              fptr, args, *child);
+#endif
+    } else {
+      assert(ABT_SUCCESS == ABT_thread_create(target_pool, fptr, args,
+                                              ABT_THREAD_ATTR_NULL, child));
+#ifdef DEBUG
+      fprintf(logger, "ChildR Id: %ld pool: %d fptr: %p args: %p Ptr: %p\n",
+              get_task_id(*child), rank, fptr, args, child);
+#endif
+    }
   } else {
     assert(ABT_SUCCESS == ABT_thread_create(target_pool, fptr, args,
                                             ABT_THREAD_ATTR_NULL, child));
 #ifdef DEBUG
-    fprintf(logger, "Child Id: %ld pool: %d fptr: %p args: %p\n",
-            get_task_id(*child), rank, fptr, args);
+    fprintf(logger, "Child Id: %ld pool: %d fptr: %p args: %p Ptr: %p\n",
+            get_task_id(*child), rank, fptr, args, child);
 #endif
   }
 #else
@@ -176,17 +184,31 @@ void argolib_join(Task_handle **list, int size) {
 
   for (int i = 0; i < size; i++) {
     // https://www.argobots.org/doxygen/latest/d0/d6d/group__ULT.html#gaf5275b75a5184bca258e803370e44bea
-    int x = ABT_thread_join(*(list[i]));
+    fprintf(logger, "JoinPtr: %p %p\n", list[i], *(list[i]));
+    /*		ABT_thread_state state = ABT_ERR_INV_THREAD;
+                int state_ret = -1;
+    while(1) {
+        state_ret = ABT_thread_get_state(*(list[i]), &state);
+        if(state_ret == ABT_SUCCESS) {
+        //if(state != ABT_ERR_INV_THREAD) break;
+        if(state == ABT_THREAD_STATE_READY || state == ABT_THREAD_STATE_RUNNING
+    || state == ABT_THREAD_STATE_BLOCKED
+                        || state == ABT_THREAD_STATE_TERMINATED) break;
+        }
+    }*/
+    ABT_thread_join(*(list[i]));
+    /*int x = ABT_thread_join(*(list[i]));
     if (x != ABT_SUCCESS) {
       fprintf(logger, "RetVal: %d\n", x);
       assert(x == ABT_SUCCESS);
-    }
+    }*/
     // https://www.argobots.org/doxygen/latest/d0/d6d/group__ULT.html#gaf31f748bfd565f97aa8ebabb89e9b632
-    x = ABT_thread_free(list[i]);
+    ABT_thread_free(list[i]);
+    /*x = ABT_thread_free(list[i]);
     if (x != ABT_SUCCESS) {
       fprintf(logger, "x = %d\n", x);
       assert(0);
-    }
+    }*/
     free(list[i]); // Free ABT_thread used in fork
     list[i] = NULL;
   }
@@ -858,6 +880,7 @@ static void create_stolen_task_container() {
     ABT_pool_get_data(pools[i], (void **)&this_pool_data);
     counter_t sc = this_pool_data->steal_counter;
     fprintf(logger, "%d: STEAL CNTR: %ld\n", i, sc);
+    fprintf(logger, "%d: TASK CNTR: %ld\n", i, this_pool_data->async_counter);
     this_pool_data->total_steals = sc;
     if (sc > 0) {
       this_pool_data->replay_data_arr =
@@ -865,8 +888,8 @@ static void create_stolen_task_container() {
       assert(this_pool_data->replay_data_arr != NULL);
       this_pool_data->replay_curr_task_ptr = this_pool_data->trace_task_list;
       for (int j = 0; j < sc; j++) {
-        //this_pool_data->replay_data_arr[j].thread = ABT_THREAD_NULL;
-        //assert(this_pool_data->replay_data_arr[j].thread == ABT_THREAD_NULL);
+        // this_pool_data->replay_data_arr[j].thread = ABT_THREAD_NULL;
+        // assert(this_pool_data->replay_data_arr[j].thread == ABT_THREAD_NULL);
         this_pool_data->replay_data_arr[j].fptr = NULL;
         this_pool_data->replay_data_arr[j].args = NULL;
         this_pool_data->replay_data_arr[j].available = 0;
@@ -1070,7 +1093,7 @@ static replay_data_t *get_thread_from_array(ABT_pool pool) {
   fprintf(logger, "POP(repArr) Waiting for stealCount: %ld pool: %d\n", sc,
           this_pool_idx);
   fflush(logger);
-  //while (p_pool->replay_data_arr[sc].thread == ABT_THREAD_NULL)
+  // while (p_pool->replay_data_arr[sc].thread == ABT_THREAD_NULL)
   while (p_pool->replay_data_arr[sc].available == 0)
     ;
   /*if (p_pool->replay_data_arr[sc].thread == ABT_THREAD_NULL) {
@@ -1122,68 +1145,71 @@ static void pool_push_3_to_pool(ABT_pool pool, ABT_unit unit,
 }
 
 static int is_stolen_task(ABT_pool pool, counter_t task_id) {
-	tracereplay_pool_t *p_pool = NULL;
+  tracereplay_pool_t *p_pool = NULL;
   ABT_pool_get_data(pool, (void **)&p_pool);
 
 #ifdef DEBUG
   assert(replay_enabled == 1);
 #endif
-    // Currently trace task list is null
-    // or not null and task id doesn't matche so nothing to match, push to pool
-    if ((p_pool->replay_curr_task_ptr == NULL) ||
-        (task_id != p_pool->replay_curr_task_ptr->trace_data.task_id)) {
-      return 0;
-    }
-	return 1;
+  // Currently trace task list is null
+  // or not null and task id doesn't matche so nothing to match, push to pool
+  if ((p_pool->replay_curr_task_ptr == NULL) ||
+      (task_id != p_pool->replay_curr_task_ptr->trace_data.task_id)) {
+    return 0;
+  }
+  return 1;
 }
 
-static void copy_stolen_task(ABT_pool pool, fork_t fptr, void *args, counter_t task_id) {
+static void copy_stolen_task(ABT_pool pool, fork_t fptr, void *args,
+                             counter_t task_id, ABT_thread *child) {
   tracereplay_pool_t *p_pool = NULL;
   ABT_pool_get_data(pool, (void **)&p_pool);
-    int this_pool_idx = get_user_pool_rank(pool);
+  int this_pool_idx = get_user_pool_rank(pool);
 
-    int target_pool_idx =
-        p_pool->replay_curr_task_ptr->trace_data.exec_pool_idx;
-    assert(p_pool->replay_curr_task_ptr->trace_data.create_pool_idx ==
-           this_pool_idx);
+  int target_pool_idx = p_pool->replay_curr_task_ptr->trace_data.exec_pool_idx;
+  assert(p_pool->replay_curr_task_ptr->trace_data.create_pool_idx ==
+         this_pool_idx);
 
 #ifdef DEBUG
-    fprintf(logger,
-            "Copying task Id: %ld stealCount: %ld from pool: %d to "
-            "pool: %d\n",
-            task_id, p_pool->replay_curr_task_ptr->trace_data.steal_count,
-            this_pool_idx, target_pool_idx);
+  fprintf(logger,
+          "Copying task Id: %ld stealCount: %ld from pool: %d to "
+          "pool: %d\n",
+          task_id, p_pool->replay_curr_task_ptr->trace_data.steal_count,
+          this_pool_idx, target_pool_idx);
 #endif
 
-    // Push to target thread's array
-    tracereplay_pool_t *target_pool = NULL;
-    ABT_pool_get_data(pools[target_pool_idx], (void **)&target_pool);
+  // Push to target thread's array
+  tracereplay_pool_t *target_pool = NULL;
+  ABT_pool_get_data(pools[target_pool_idx], (void **)&target_pool);
 
-    assert(target_pool
-               ->replay_data_arr[p_pool->replay_curr_task_ptr->trace_data
-                                     .steal_count]
-               .available == 0);
-    assert((p_pool->replay_curr_task_ptr->trace_data.steal_count >= 0) &&
-           (p_pool->replay_curr_task_ptr->trace_data.steal_count <
-            target_pool->total_steals));
-    target_pool
-        ->replay_data_arr[p_pool->replay_curr_task_ptr->trace_data.steal_count]
-        .fptr = fptr;
-    target_pool
-        ->replay_data_arr[p_pool->replay_curr_task_ptr->trace_data.steal_count]
-        .args = args;
+  assert(target_pool
+             ->replay_data_arr[p_pool->replay_curr_task_ptr->trace_data
+                                   .steal_count]
+             .available == 0);
+  assert((p_pool->replay_curr_task_ptr->trace_data.steal_count >= 0) &&
+         (p_pool->replay_curr_task_ptr->trace_data.steal_count <
+          target_pool->total_steals));
+  target_pool
+      ->replay_data_arr[p_pool->replay_curr_task_ptr->trace_data.steal_count]
+      .fptr = fptr;
+  target_pool
+      ->replay_data_arr[p_pool->replay_curr_task_ptr->trace_data.steal_count]
+      .args = args;
+  target_pool
+      ->replay_data_arr[p_pool->replay_curr_task_ptr->trace_data.steal_count]
+      .thread_ptr = child;
 
-     target_pool
-        ->replay_data_arr[p_pool->replay_curr_task_ptr->trace_data.steal_count]
-        .available = 1;
+  target_pool
+      ->replay_data_arr[p_pool->replay_curr_task_ptr->trace_data.steal_count]
+      .available = 1;
 #ifdef DEBUG
-    fprintf(logger, "Copied task Id: %ld Idx: %ld from pool: %d to pool: %d\n",
-            task_id, p_pool->replay_curr_task_ptr->trace_data.steal_count,
-            this_pool_idx, target_pool_idx);
+  fprintf(logger, "Copied task Id: %ld Idx: %ld from pool: %d to pool: %d\n",
+          task_id, p_pool->replay_curr_task_ptr->trace_data.steal_count,
+          this_pool_idx, target_pool_idx);
 #endif
 
-    // Incr
-    p_pool->replay_curr_task_ptr = p_pool->replay_curr_task_ptr->next;
+  // Incr
+  p_pool->replay_curr_task_ptr = p_pool->replay_curr_task_ptr->next;
 }
 #if 0
 static int stolen_task(ABT_pool pool, ABT_thread thread) {
@@ -1381,25 +1407,19 @@ void sched_run_3(ABT_sched sched) {
         // ABT_thread thread = get_thread_from_array(pool[0]);
         replay_data_t *replay_data = get_thread_from_array(pool[0]);
         if (replay_data != NULL) {
-          //ABT_thread thread = replay_data->thread;
-	  counter_t stolen_task_id = 0;
-          fprintf(logger, "GotRR(Stole) pool: %d, taskId: %ld\n", this_pool_idx,
-                  stolen_task_id);
-          /*
-            assert(ABT_pool_push_thread(pool[0], thread) ==
-                   ABT_SUCCESS); // Push in its own pool
-            */
-          ABT_thread *child = (ABT_thread *)malloc(sizeof(ABT_thread *));
-          /*void *args = NULL;
-          assert(ABT_thread_get_arg(thread, &args) == ABT_SUCCESS);
-          void (*thread_func)(void *) = NULL;
-          assert(ABT_thread_get_thread_func(thread, &thread_func) ==
-                 ABT_SUCCESS);*/
-          assert(ABT_SUCCESS == ABT_thread_create(pool[0], replay_data->fptr,
-                                                  replay_data->args,
-                                                  ABT_THREAD_ATTR_NULL, child));
-          printf("Created ID: %ld \n", get_task_id(*child));
-          // exit(-1);
+          // ABT_thread thread = replay_data->thread;
+          counter_t stolen_task_id = 0;
+          fprintf(logger, "GotRR(Stole) pool: %d, taskId: %ld Ptr: %p\n",
+                  this_pool_idx, stolen_task_id, replay_data->thread_ptr);
+          int x;
+          x = ABT_thread_create(pool[0], replay_data->fptr, replay_data->args,
+                                ABT_THREAD_ATTR_NULL, replay_data->thread_ptr);
+          assert(x == ABT_SUCCESS);
+#ifdef DEBUG
+          fprintf(logger, "Created ID: %ld Ptr: %p %p\n",
+                  get_task_id(*(replay_data->thread_ptr)),
+                  replay_data->thread_ptr, *(replay_data->thread_ptr));
+#endif
         }
       }
     } else {

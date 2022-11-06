@@ -77,10 +77,11 @@ typedef struct trace_task_list_t {
 } trace_task_list_t;
 
 typedef struct replay_data_t {
-  //ABT_thread thread;
+  // ABT_thread thread;
   counter_t task_id;
   fork_t fptr;
   void *args;
+  ABT_thread *thread_ptr;
   int available;
 } replay_data_t;
 
