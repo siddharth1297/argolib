@@ -1,13 +1,19 @@
 /*
  * Common definitions and includes for argolib
  */
+#define _GNU_SOURCE // NOT WORING FOR CPP
 #ifndef ARGOLIBDEFS_H
 #define ARGOLIBDEFS_H
+    
 
 #include <assert.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
+//#include "cpucounters.h" //PCM related: https://github.com/intel/pcm
+//#include "utils.h"       //PCM related: https://github.com/intel/pcm
+         
+      
 
 #include "abt.h"
 
