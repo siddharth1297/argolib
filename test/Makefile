@@ -7,13 +7,13 @@ SRCCPP=$(wildcard *.cpp)
 CPPTARGETS=$(patsubst %.cpp,%,$(SRCCPP))
 
 
-default: $(CTARGETS)
+#default: $(CTARGETS)
 
-%: %.c
-	gcc -std=c11 -Werror -O3 \
-		-I${ARGOLIB_INSTALL_DIR}/include -I${ARGOBOTS_INSTALL_DIR}/include   \
-		-L${ARGOBOTS_INSTALL_DIR}/lib -L${ARGOLIB_INSTALL_DIR}/lib  \
-	        -o $*.out $< -largolib -labt 
+#%: %.c
+#	gcc -std=c11 -Werror -O3 \
+#		-I${ARGOLIB_INSTALL_DIR}/include -I${ARGOBOTS_INSTALL_DIR}/include   \
+#		-L${ARGOBOTS_INSTALL_DIR}/lib -L${ARGOLIB_INSTALL_DIR}/lib  \
+#	        -o $*.out $< -largolib -labt 
 
 default: $(CPPTARGETS)
 

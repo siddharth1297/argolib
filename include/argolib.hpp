@@ -11,6 +11,7 @@
 #include <cstring>
 #include <iostream>
 
+/*
 extern "C" {
 extern void argolib_init(int argc, char **argv);
 extern void argolib_finalize();
@@ -18,7 +19,8 @@ extern void argolib_kernel(fork_t fptr, void *args);
 extern Task_handle *argolib_fork(fork_t fptr, void *args);
 void argolib_join(Task_handle **list, int size);
 }
-
+*/
+#include "argolib.h"
 namespace argolib {
 
 /*
