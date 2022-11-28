@@ -18,10 +18,10 @@ CPPTARGETS=$(patsubst %.cpp,%,$(SRCCPP))
 default: $(CPPTARGETS)
 
 %: %.cpp
-	g++ -std=c++11 -Werror -O3 \
-                -I${ARGOLIB_INSTALL_DIR}/include -I${ARGOBOTS_INSTALL_DIR}/include  \
-                -L${ARGOBOTS_INSTALL_DIR}/lib -L${ARGOLIB_INSTALL_DIR}/lib  \
-                -o $*.out $< -largolib -labt 
+	g++ -std=c++11 -Werror -O0 -ggdb \
+                -I${ARGOLIB_INSTALL_DIR}/include -I${ARGOBOTS_INSTALL_DIR}/include -I${PCMROOT}/src \
+                -L${ARGOBOTS_INSTALL_DIR}/lib -L${ARGOLIB_INSTALL_DIR}/lib -L${PCMROOT}/build/lib \
+                -o $*.out $< -largolib -labt -lpcm
 
 format:
 	clang-format -i *.c

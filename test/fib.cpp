@@ -1,24 +1,34 @@
-#include <iostream>
-
 #include "argolib.hpp"
 
-int fib(int n) {
-  if (n < 2)
-    return n;
+#define FIB_N 45
+#define THRESHOLD 25
 
-  int x, y;
-  Task_handle *task1 = argolib::fork([&]() { x = fib(n - 1); });
-  Task_handle *task2 = argolib::fork([&]() { y = fib(n - 2); });
-  argolib::join(task1, task2);
-  return x + y;
+int fib_seq(int n) {
+    if(n<2) return n;
+    else return fib_seq(n-1) + fib_seq(n-2);
 }
 
-int main(int argc, char **argv) {
-  argolib::init(argc, argv);
-  int n = 10;
-  int result;
-  argolib::kernel([&]() { result = fib(n); });
-  std::cout << "Fib(" << n << ") = " << result << std::endl;
-  argolib::finalize();
-  return 0;
+int fib(int n) {
+    if(n <= THRESHOLD) {
+        return fib_seq(n);
+    } else {
+	int x, y;
+        Task_handle* task = argolib::fork([&]() {
+          x = fib(n-1);
+	});
+	y = fib(n-2);
+	argolib::join(task);
+	return x + y;
+    }
+}
+
+int main(int argc, char **argv) { 
+    argolib::init(argc, argv);
+    int res;
+    //timer::kernel("Fib kernel", [&]() {
+    argolib::kernel([&]() {
+        res = fib(FIB_N);
+    });
+    printf("Fib[%d]: %d\n", FIB_N, res);
+    argolib::finalize();
 }

@@ -12,6 +12,21 @@ void* daemon_profiler(){
   return NULL;
 }
 
+static int get_user_pool_rank(ABT_pool pool) {
+  int pool_idx = 0;
+  // TODO: Use pointer arithmetic
+  for (; pool_idx < streams; pool_idx++) {
+    if (pools[pool_idx] == pool)
+      break;
+  }
+  if (pool_idx == streams) {
+    printf("PoolIdNotFound pool: %p\n", pool);
+    pool_idx = -1;
+    assert(0);
+  }
+  return pool_idx;
+}
+
 void argolib_init(int argc, char **argv) {
 
   // make push() and pop() with pointers,ABT_ppol_pop inside user defined pop is
@@ -51,11 +66,11 @@ void argolib_init(int argc, char **argv) {
   for (int i = 1; i < streams; i++) {
     ABT_xstream_create(scheds[i], &xstreams[i]);
   }
-
+/*
   cpu_set_t cpuset;
   CPU_ZERO(&cpuset);
   CPU_SET(0, &cpuset);
-
+*/
   //TODO: Make _GNU_SOURCE work for Cpp
   //pthread_create(&profiler_thread,NULL,daemon_profiler,NULL);
   //pthread_setaffinity_np(profiler_thread, sizeof(cpu_set_t), &cpuset);
@@ -90,11 +105,9 @@ void argolib_finalize() {
     ABT_xstream_join(xstreams[i]);
     ABT_xstream_free(&xstreams[i]);
   }
-
   //pthread_join(profiler_thread,NULL);
 
   ABT_finalize();
-
   /* Free allocated memory. */
   free(xstreams);
   free(pools);
@@ -171,37 +184,41 @@ void sched_run_1(ABT_sched sched) {
   ABT_sched_get_data(sched, (void **)&p_data);
   pool = (ABT_pool *)malloc(1 * sizeof(ABT_pool));
   ABT_sched_get_pools(sched, 1, 0, pool);
-
+  
   while (1) {
 
     ABT_thread thread;
-    ABT_unit unit;
-    ABT_pool_pop(pool[0], &unit);
-    ABT_unit_get_thread(unit, &thread);
+    //ABT_unit unit;
+    //ABT_pool_pop(pool[0], &unit);
+    //ABT_unit_get_thread(unit, &thread);
 
-    if (thread != ABT_THREAD_NULL) {
-
+    //if (thread != ABT_THREAD_NULL) {
+    int pop_stat = ABT_pool_pop_thread(pool[0], &thread);
+    assert(pop_stat == ABT_SUCCESS);
+    if (pop_stat == ABT_SUCCESS && thread != ABT_THREAD_NULL) {
       ABT_self_schedule(thread, pool[0]);
 
     } else {
       target_pool = rand() % streams;
-
+      /*
       ABT_pool_pop(pools[target_pool], &unit);
       ABT_unit_get_thread(unit, &thread);
+      */
+      if ((ABT_pool_pop_thread_ex(pools[target_pool], &thread,
+                                      ABT_POOL_CONTEXT_OWNER_SECONDARY) ==
+               ABT_SUCCESS) &&
+              (thread != ABT_THREAD_NULL)) {
 
-      if (thread != ABT_THREAD_NULL) {
-
-        ABT_pool_push(pool[0], unit);
+        //ABT_pool_push(pool[0], unit);
+        ABT_self_schedule(thread, pool[0]);
+      //printf("stolen task\n");
       }
-
-      // printf("stolen task\n");
     }
 
     if (finish == 1) {
       ABT_sched_finish(sched);
       break;
     }
-
     if (++work_count >= p_data->event_freq) {
       work_count = 0;
       ABT_xstream_check_events(sched);
@@ -247,11 +264,21 @@ ABT_unit pool_create_unit_1(ABT_pool pool, ABT_thread thread) {
   if (!p_unit)
     return ABT_UNIT_NULL;
   p_unit->thread = thread;
+#ifdef DEBUG
+  ABT_unit_id thread_id;
+  assert(ABT_thread_get_id(thread, &thread_id) == ABT_SUCCESS);
+  printf("Created ThreadId: %ld pool: %d\n", thread_id, get_user_pool_rank(pool));
+#endif
   return (ABT_unit)p_unit;
 }
 
 void pool_free_unit_1(ABT_pool pool, ABT_unit unit) {
   unit_t *p_unit = (unit_t *)unit;
+#ifdef DEBUG
+  ABT_unit_id thread_id;
+  assert(ABT_thread_get_id(p_unit->thread, &thread_id) == ABT_SUCCESS);
+  printf("Finished ThreadId: %ld pool: %d\n", thread_id, get_user_pool_rank(pool));
+#endif
   free(p_unit);
 }
 
@@ -266,11 +293,17 @@ ABT_thread pool_pop_1(ABT_pool pool, ABT_pool_context tail) {
   pool_t *p_pool;
   ABT_pool_get_data(pool, (void **)&p_pool);
   unit_t *p_unit = NULL;
+  int own_pool = !(tail == ABT_POOL_CONTEXT_OWNER_SECONDARY);
+  
+  //if (!(tail & ABT_POOL_CONTEXT_OWNER_SECONDARY)) {
+  if (own_pool) {
+	  // TODO: Remove it after fixing crash issue
+    pthread_mutex_lock(&p_pool->lock);
 
-  if (!(tail & ABT_POOL_CONTEXT_OWNER_SECONDARY)) {
-
-    if (p_pool->p_head == NULL)
+    if (p_pool->p_head == NULL) {
+      pthread_mutex_unlock(&p_pool->lock);
       return ABT_THREAD_NULL;
+    }
 
     if (p_pool->p_head == p_pool->p_tail) {
       // Only one thread.
@@ -282,13 +315,21 @@ ABT_thread pool_pop_1(ABT_pool pool, ABT_pool_context tail) {
       p_unit = p_pool->p_tail;
       p_pool->p_tail = p_unit->p_next;
     }
+      pthread_mutex_unlock(&p_pool->lock);
 
   } else {
-
+	// TODO: Set granularity after fixing crash
     pthread_mutex_lock(&p_pool->lock);
 
-    if (p_pool->p_head == NULL)
+    // If only one thread or no thread
+    if (p_pool->p_head == NULL) {
+      pthread_mutex_unlock(&p_pool->lock);
       return ABT_THREAD_NULL;
+     }
+    if (p_pool->p_head == p_pool->p_tail) {
+      pthread_mutex_unlock(&p_pool->lock);
+      return ABT_THREAD_NULL;
+     }
 
     // Pop from the head.
     p_unit = p_pool->p_head;
