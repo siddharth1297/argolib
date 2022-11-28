@@ -14,7 +14,7 @@ static int counter = 0;
 static int finish = 0;
 static int pool_id = 0;
 pthread_t profiler_thread;
-static PCM *___pcm;
+//static PCM *___pcm;
 //SystemCounterState ___before_sstate, ___after_sstate;
 
 void* daemon_profiler();
