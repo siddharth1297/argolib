@@ -10,15 +10,22 @@ static int streams = 0;
 static ABT_xstream *xstreams = NULL;
 static ABT_pool *pools = NULL;
 static ABT_sched *scheds = NULL;
+static int *active=NULL;
 static int counter = 0;
 static int finish = 0;
 static int pool_id = 0;
+static int wactive;
 pthread_t profiler_thread;
+static int first_configureDOP=1;
+static int lastAction=1;
 static pcm::PCM *___pcm;
 static pcm::SystemCounterState ___before_sstate, ___after_sstate;
 
 void* daemon_profiler();
-void configure_DOP();
+void configure_DOP(double JPI_prev,double JPI_curr);
+
+void sleep_argolib_workers(int w);
+void awake_argolib_workers(int w);
 /**
  * Initializes the ArgoLib runtime, and it should be the first thing to call in
  * the user main. Arguments “argc” and “argv” are the ones passed in the call to

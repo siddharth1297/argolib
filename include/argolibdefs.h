@@ -10,6 +10,8 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include<unistd.h>  
+#include<chrono>
 #include "cpucounters.h" //PCM related: https://github.com/intel/pcm
 #include "utils.h"       //PCM related: https://github.com/intel/pcm
          
@@ -54,6 +56,14 @@ typedef struct pool_overhead {
   unit_t *p_tail;
   int wu; // work units in the pool
 } pool_overhead_t;
+
+typedef struct pool_energy {
+ 
+  pthread_mutex_t lock;
+  unit_t *p_head;
+  unit_t *p_tail;
+  int active;
+} pool_energy_t;
 
 struct {
         int (*pcm_c_build_core_event)(uint8_t id, const char * argv);

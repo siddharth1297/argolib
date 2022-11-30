@@ -3,13 +3,129 @@
  */
 #include "argolib.h"
 
-void* daemon_profiler(){
+void awake_argolib_workers(int w){
+
+    for(int i=0;i<streams &&w>0;i++){
+
+    pool_energy_t *p_pool;
+
+     ABT_pool_get_data(pools[i], (void **)&p_pool);
+
+     if(p_pool->active==0) {
+
+      p_pool->active=1;
+      w--;
+     }
+
+     free(p_pool);
+
+
+  }
+
+}
+
+void sleep_argolib_workers(int w){
+
+ 
+
+  for(int i=0;i<streams &&w>0;i++){
+
+    pool_energy_t *p_pool;
+
+     ABT_pool_get_data(pools[i], (void **)&p_pool);
+
+     if(p_pool->active==1) {
+
+      p_pool->active=0;
+      w--;
+     }
+
+     free(p_pool);
+
+
+  }
+}
+
+void* daemon_profiler(void *arg){
+
+ // const int fixed_interval= 20ms; //20 ms
+
+  std::this_thread::sleep_for(std::chrono::seconds(1)); //warmup
+
+  double JPI_prev=0;
 
   while(finish==0){
 
-    printf("Daemon Profiler\n");
+    
+     ___after_sstate = pcm::getSystemCounterState();
+    double JPI_curr=getConsumedJoules(___before_sstate, ___after_sstate);
+    configure_DOP(JPI_prev,JPI_curr);
+    JPI_prev=JPI_curr;
+    
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    ___before_sstate = pcm::getSystemCounterState();
   }
   return NULL;
+}
+
+void configure_DOP( double JPI_prev,double JPI_curr){
+
+  
+   int wchange=0;
+
+  if(first_configureDOP==1){
+
+    first_configureDOP=0;
+   
+   wchange=wactive/2;
+    sleep_argolib_workers(wchange);
+    wactive=wchange;
+    lastAction=0;
+    return;
+  }
+
+  if(JPI_curr<JPI_prev){
+
+    if(lastAction==0){
+      
+      wchange=wactive/2;
+      if(wactive<=wchange) return;
+      wactive-=wchange;
+      
+      sleep_argolib_workers(wchange);
+    }
+
+    else{ 
+      
+      wchange=(streams+wactive)>>1;
+      if(wactive-wchange>streams) return;
+      wactive+=wchange;
+      awake_argolib_workers(wchange);  
+    }  
+  }
+
+  else{
+
+    if(lastAction==0){
+      wchange=(streams+wactive)>>1;
+      if(wactive-wchange>streams) return;
+      wactive+=wchange;
+      awake_argolib_workers(wchange);  
+      lastAction=1;
+    }
+
+    else{
+
+      wchange=wactive/2;
+      if(wactive<=wchange) return;
+      wactive-=wchange;
+      sleep_argolib_workers(wchange);
+      lastAction=0;
+
+    }
+  }
+
+
 }
 
 static int get_user_pool_rank(ABT_pool pool) {
@@ -44,11 +160,16 @@ void argolib_init(int argc, char **argv) {
 
   printf("No of streams = %d\n", streams);
 
+   wactive=streams;
+
 
   /* Allocate memory. */
   xstreams = (ABT_xstream *)malloc(sizeof(ABT_xstream) * streams);
   pools = (ABT_pool *)malloc(sizeof(ABT_pool) * streams);
   scheds = (ABT_sched *)malloc(sizeof(ABT_sched) * streams);
+  active=(int *)malloc(sizeof(int)*streams);
+
+  for(int i=0;i<streams;i++) active[i]=1;
 
 
   printf("Starting with Mode: RAND_WS\n");
@@ -66,15 +187,15 @@ void argolib_init(int argc, char **argv) {
   for (int i = 1; i < streams; i++) {
     ABT_xstream_create(scheds[i], &xstreams[i]);
   }
-/*
+
   cpu_set_t cpuset;
   CPU_ZERO(&cpuset);
   CPU_SET(0, &cpuset);
-*/
+
   //TODO: Make _GNU_SOURCE work for Cpp
-  //pthread_create(&profiler_thread,NULL,daemon_profiler,NULL);
-  //pthread_setaffinity_np(profiler_thread, sizeof(cpu_set_t), &cpuset);
-/*
+  pthread_create(&profiler_thread,NULL,&daemon_profiler,NULL);
+  pthread_setaffinity_np(profiler_thread, sizeof(cpu_set_t), &cpuset);
+
     ___pcm = pcm::PCM::getInstance();
         ___pcm->resetPMU();
     // program() creates common semaphore for the singleton, so ideally to be called before any other references to PCM
@@ -96,7 +217,7 @@ void argolib_init(int argc, char **argv) {
         fprintf(stderr, "Access to Processor Counter Monitor has denied (Unknown error).\n");
         exit(EXIT_FAILURE);
     }
-*/
+
 }
 
 void argolib_finalize() {
@@ -105,7 +226,7 @@ void argolib_finalize() {
     ABT_xstream_join(xstreams[i]);
     ABT_xstream_free(&xstreams[i]);
   }
-  //pthread_join(profiler_thread,NULL);
+  pthread_join(profiler_thread,NULL);
 
   ABT_finalize();
   /* Free allocated memory. */
@@ -180,12 +301,16 @@ void sched_run_1(ABT_sched sched) {
   ABT_pool *pool;
   int target_pool;
   ABT_bool stop;
+  pool_energy_t *p_pool;
 
   ABT_sched_get_data(sched, (void **)&p_data);
   pool = (ABT_pool *)malloc(1 * sizeof(ABT_pool));
   ABT_sched_get_pools(sched, 1, 0, pool);
+  ABT_pool_get_data(pool[0], (void **)&p_pool);
   
   while (1) {
+
+    if(p_pool->active==0) continue;
 
     ABT_thread thread;
     //ABT_unit unit;
@@ -283,14 +408,14 @@ void pool_free_unit_1(ABT_pool pool, ABT_unit unit) {
 }
 
 ABT_bool pool_is_empty_1(ABT_pool pool) {
-  pool_t *p_pool;
+  pool_energy_t *p_pool;
   ABT_pool_get_data(pool, (void **)&p_pool);
   return p_pool->p_head ? ABT_FALSE : ABT_TRUE;
 }
 
 ABT_thread pool_pop_1(ABT_pool pool, ABT_pool_context tail) {
 
-  pool_t *p_pool;
+  pool_energy_t *p_pool;
   ABT_pool_get_data(pool, (void **)&p_pool);
   unit_t *p_unit = NULL;
   int own_pool = !(tail == ABT_POOL_CONTEXT_OWNER_SECONDARY);
@@ -344,7 +469,7 @@ ABT_thread pool_pop_1(ABT_pool pool, ABT_pool_context tail) {
 }
 
 void pool_push_1(ABT_pool pool, ABT_unit unit, ABT_pool_context c) {
-  pool_t *p_pool;
+  pool_energy_t *p_pool;
   ABT_pool_get_data(pool, (void **)&p_pool);
   unit_t *p_unit = (unit_t *)unit;
 
@@ -358,7 +483,7 @@ void pool_push_1(ABT_pool pool, ABT_unit unit, ABT_pool_context c) {
 }
 
 int pool_init_1(ABT_pool pool, ABT_pool_config config) {
-  pool_t *p_pool = (pool_t *)calloc(1, sizeof(pool_t));
+  pool_energy_t *p_pool = (pool_energy_t *)calloc(1, sizeof(pool_energy_t));
   if (!p_pool)
     return ABT_ERR_MEM;
 
@@ -367,12 +492,13 @@ int pool_init_1(ABT_pool pool, ABT_pool_config config) {
     free(p_pool);
     return ABT_ERR_SYS;
   }
+  p_pool->active=1;
   ABT_pool_set_data(pool, (void *)p_pool);
   return ABT_SUCCESS;
 }
 
 void pool_free_1(ABT_pool pool) {
-  pool_t *p_pool;
+  pool_energy_t *p_pool;
   ABT_pool_get_data(pool, (void **)&p_pool);
   pthread_mutex_destroy(&p_pool->lock);
   free(p_pool);
