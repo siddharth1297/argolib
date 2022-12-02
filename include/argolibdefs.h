@@ -60,6 +60,8 @@ typedef struct pool_overhead {
 typedef struct pool_energy {
  
   pthread_mutex_t lock;
+  pthread_mutex_t active_lock;
+  pthread_cond_t cond;
   unit_t *p_head;
   unit_t *p_tail;
   int active;

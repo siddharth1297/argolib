@@ -13,7 +13,14 @@ void awake_argolib_workers(int w){
 
      if(p_pool->active==0) {
 
+      pthread_mutex_lock(&p_pool->active_lock);
       p_pool->active=1;
+
+      pthread_cond_signal(&p_pool->cond);
+      
+      pthread_mutex_unlock(&p_pool->active_lock);
+
+
       w--;
      }
 
@@ -310,7 +317,12 @@ void sched_run_1(ABT_sched sched) {
   
   while (1) {
 
-    if(p_pool->active==0) continue;
+    if(p_pool->active==0) {
+
+      pthread_mutex_lock(&p_pool->active_lock);
+      pthread_cond_wait(&p_pool->cond, &p_pool->active_lock);
+     //continue;
+    }
 
     ABT_thread thread;
     //ABT_unit unit;
@@ -488,7 +500,9 @@ int pool_init_1(ABT_pool pool, ABT_pool_config config) {
     return ABT_ERR_MEM;
 
   int ret = pthread_mutex_init(&p_pool->lock, 0);
-  if (ret != 0) {
+  int ret2= pthread_mutex_init(&p_pool->active_lock,0);
+  int ret3 = pthread_cond_init(&p_pool->cond, 0);
+  if (ret != 0 || ret2!=0 || ret3!=0) {
     free(p_pool);
     return ABT_ERR_SYS;
   }
@@ -501,6 +515,8 @@ void pool_free_1(ABT_pool pool) {
   pool_energy_t *p_pool;
   ABT_pool_get_data(pool, (void **)&p_pool);
   pthread_mutex_destroy(&p_pool->lock);
+  pthread_mutex_destroy(&p_pool->active_lock);
+  pthread_cond_destroy(&p_pool->cond);
   free(p_pool);
 }
 
