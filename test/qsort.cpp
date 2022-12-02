@@ -78,6 +78,7 @@ int main(int argc, char **argv) {
   else{
     printf("QuickSort failed\n");
   }
+  printf("Hello\n");
   argolib::finalize();
   delete []data;
   return 0;

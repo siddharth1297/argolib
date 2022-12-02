@@ -5,7 +5,7 @@
 
 void awake_argolib_workers(int w){
 
-    for(int i=0;i<streams &&w>0;i++){
+  for(int i=0;i<streams &&w>0;i++){
 
     pool_energy_t *p_pool;
 
@@ -16,15 +16,16 @@ void awake_argolib_workers(int w){
       pthread_mutex_lock(&p_pool->active_lock);
       p_pool->active=1;
 
-      pthread_cond_signal(&p_pool->cond);
+      
       
       pthread_mutex_unlock(&p_pool->active_lock);
+      pthread_cond_signal(&p_pool->cond);
 
 
       w--;
      }
 
-     free(p_pool);
+     //free(p_pool);
 
 
   }
@@ -47,7 +48,7 @@ void sleep_argolib_workers(int w){
       w--;
      }
 
-     free(p_pool);
+     //free(p_pool);
 
 
   }
@@ -66,12 +67,15 @@ void* daemon_profiler(void *arg){
     
      ___after_sstate = pcm::getSystemCounterState();
     double JPI_curr=getConsumedJoules(___before_sstate, ___after_sstate);
+    
     configure_DOP(JPI_prev,JPI_curr);
     JPI_prev=JPI_curr;
     
     std::this_thread::sleep_for(std::chrono::milliseconds(20));
     ___before_sstate = pcm::getSystemCounterState();
   }
+
+  awake_argolib_workers(streams);
   return NULL;
 }
 
@@ -225,15 +229,26 @@ void argolib_init(int argc, char **argv) {
         exit(EXIT_FAILURE);
     }
 
+  
+
 }
 
 void argolib_finalize() {
 
+  //printf("value of finish in finalise function is %d\n",finish);
+  printf("Finalise function\n");
+  
   for (int i = 1; i < streams; i++) {
-    ABT_xstream_join(xstreams[i]);
+    printf("Xstream end\n");
+    //ABT_xstream_join(xstreams[i]);
+    int x=ABT_xstream_join(xstreams[i]);
+    assert(x==ABT_SUCCESS);
     ABT_xstream_free(&xstreams[i]);
   }
+
+  printf("xstreams have finished\n");
   pthread_join(profiler_thread,NULL);
+  printf("profiler thread\n");
 
   ABT_finalize();
   /* Free allocated memory. */
@@ -248,6 +263,7 @@ void argolib_kernel(fork_t fptr, void *args) {
   fptr(args);
 
   finish = 1;
+  printf("value of finish in kernel is %d\n",finish);
   printf("Task count :%d\n", counter);
   double t2 = ABT_get_wtime();
   printf("elapsed time: %.3f \n", (t2 - t1) * 1.0e3);
@@ -324,19 +340,25 @@ void sched_run_1(ABT_sched sched) {
      //continue;
     }
 
+
+
     ABT_thread thread;
     //ABT_unit unit;
     //ABT_pool_pop(pool[0], &unit);
     //ABT_unit_get_thread(unit, &thread);
 
     //if (thread != ABT_THREAD_NULL) {
+
+    
     int pop_stat = ABT_pool_pop_thread(pool[0], &thread);
     assert(pop_stat == ABT_SUCCESS);
+    
     if (pop_stat == ABT_SUCCESS && thread != ABT_THREAD_NULL) {
       ABT_self_schedule(thread, pool[0]);
 
     } else {
       target_pool = rand() % streams;
+      
       /*
       ABT_pool_pop(pools[target_pool], &unit);
       ABT_unit_get_thread(unit, &thread);
@@ -353,13 +375,16 @@ void sched_run_1(ABT_sched sched) {
     }
 
     if (finish == 1) {
-      ABT_sched_finish(sched);
+      //printf("value of finish in sched is %d\n",finish);
+      ABT_sched_exit(sched);
       break;
     }
     if (++work_count >= p_data->event_freq) {
       work_count = 0;
       ABT_xstream_check_events(sched);
     }
+
+    //printf("finish is %d\n",finish);
   }
   free(pool);
 }
@@ -452,7 +477,7 @@ ABT_thread pool_pop_1(ABT_pool pool, ABT_pool_context tail) {
       p_unit = p_pool->p_tail;
       p_pool->p_tail = p_unit->p_next;
     }
-      pthread_mutex_unlock(&p_pool->lock);
+    pthread_mutex_unlock(&p_pool->lock);
 
   } else {
 	// TODO: Set granularity after fixing crash
