@@ -5,7 +5,7 @@
 
 void awake_argolib_workers(int w){
 
-  for(int i=0;i<streams &&w>0;i++){
+  for(int i=1;i<streams &&w>0;i++){
 
     pool_energy_t *p_pool;
 
@@ -13,6 +13,7 @@ void awake_argolib_workers(int w){
 
      if(p_pool->active==0) {
 
+      printf("Xstream number %d is going to be awaken\n",i);
       pthread_mutex_lock(&p_pool->active_lock);
       p_pool->active=1;
 
@@ -36,7 +37,7 @@ void sleep_argolib_workers(int w){
 
  
 
-  for(int i=0;i<streams &&w>0;i++){
+  for(int i=1;i<streams &&w>0;i++){
 
     pool_energy_t *p_pool;
 
@@ -44,6 +45,7 @@ void sleep_argolib_workers(int w){
 
      if(p_pool->active==1) {
 
+      printf("Xstream number %d is going to sleep\n",i);
       p_pool->active=0;
       w--;
      }
@@ -63,6 +65,8 @@ void* daemon_profiler(void *arg){
   double JPI_prev=0;
 
   while(finish==0){
+
+   // continue;
 
     
      ___after_sstate = pcm::getSystemCounterState();
@@ -309,6 +313,8 @@ void argolib_join(Task_handle **list, int size) {
 
 int sched_init_1(ABT_sched sched, ABT_sched_config config) {
 
+  printf("Sched init\n");
+
   sched_data_t *p_data = (sched_data_t *)calloc(1, sizeof(sched_data_t));
 
   ABT_sched_config_read(config, 1, &p_data->event_freq);
@@ -337,6 +343,7 @@ void sched_run_1(ABT_sched sched) {
 
       pthread_mutex_lock(&p_pool->active_lock);
       pthread_cond_wait(&p_pool->cond, &p_pool->active_lock);
+      pthread_mutex_unlock(&p_pool->active_lock); //TEST
      //continue;
     }
 
@@ -354,10 +361,16 @@ void sched_run_1(ABT_sched sched) {
     assert(pop_stat == ABT_SUCCESS);
     
     if (pop_stat == ABT_SUCCESS && thread != ABT_THREAD_NULL) {
+
+      // if(finish==1)
+      //   printf("own pool\n");
+    
       ABT_self_schedule(thread, pool[0]);
 
     } else {
       target_pool = rand() % streams;
+
+     
       
       /*
       ABT_pool_pop(pools[target_pool], &unit);
@@ -367,16 +380,24 @@ void sched_run_1(ABT_sched sched) {
                                       ABT_POOL_CONTEXT_OWNER_SECONDARY) ==
                ABT_SUCCESS) &&
               (thread != ABT_THREAD_NULL)) {
+              // if(finish==1) printf("work stealing\n");
 
         //ABT_pool_push(pool[0], unit);
         ABT_self_schedule(thread, pool[0]);
       //printf("stolen task\n");
       }
+
+      // else{
+      //   if(finish==1) printf("No task for ws\n");
+      // }
     }
 
     if (finish == 1) {
       //printf("value of finish in sched is %d\n",finish);
-      ABT_sched_exit(sched);
+      assert(ABT_sched_exit(sched)==ABT_SUCCESS);
+      //printf("break\n");
+     // assert(x==ABT_SUCCESS);
+      
       break;
     }
     if (++work_count >= p_data->event_freq) {
@@ -384,12 +405,15 @@ void sched_run_1(ABT_sched sched) {
       ABT_xstream_check_events(sched);
     }
 
+  
     //printf("finish is %d\n",finish);
   }
   free(pool);
 }
 
 int sched_free_1(ABT_sched sched) {
+
+  printf("sched free\n");
 
   sched_data_t *p_data;
 
