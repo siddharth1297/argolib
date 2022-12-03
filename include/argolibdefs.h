@@ -27,6 +27,8 @@ struct pool_t {
   pthread_mutex_t lock;
   unit_t *p_head;
   unit_t *p_tail;
+  size_t task_count;  // No of tasks produced by this pool
+  size_t task_stolen; // No of tasks stolen from this pool
 };
 
 typedef struct {

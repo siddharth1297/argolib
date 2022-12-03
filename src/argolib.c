@@ -3,6 +3,8 @@
  */
 #include "argolib.h"
 
+static int get_user_pool_rank(ABT_pool pool);
+
 void argolib_init(int argc, char **argv) {
 
   // make push() and pop() with pointers,ABT_ppol_pop inside user defined pop is
@@ -11,14 +13,14 @@ void argolib_init(int argc, char **argv) {
 
   char *streamsStr = getenv("ARGOLIB_WORKERS");
   if (streamsStr == NULL) {
-    fprintf(stderr, "ARGOLIB_WORKERS is not set\n");
+    fprintf(stderr, "ARGOLIB_WORKERS WORKERS NONE\n");
   } else {
     streams = atoi(streamsStr);
   }
   if (streams <= 0)
     streams = 1;
 
-  printf("No of streams = %d\n", streams);
+  fprintf(stdout, "ARGOLIB_NUMSTREAMS NUMSTREAMS %d\n", streams);
 
   mode = 0;
   assert(mode != -1);
@@ -29,13 +31,13 @@ void argolib_init(int argc, char **argv) {
   scheds = (ABT_sched *)malloc(sizeof(ABT_sched) * streams);
 
   if (mode == 0) {
-    printf("Starting with Mode: RAND_WS\n");
+    fprintf(stdout, "ARGOLIB_MODE MODE RAND_WS\n");
     /* Create pools */
     create_pools_1(streams, pools);
     /* Create schedulers */
     create_scheds_1(streams, pools, scheds);
   } else {
-    printf("Incorrect mode\n");
+    fprintf(stderr, "ARGOLIB_MODE MODE INCORRECT\n");
     assert(0);
   }
 
@@ -57,6 +59,19 @@ void argolib_finalize() {
     ABT_xstream_free(&xstreams[i]);
   }
 
+  size_t total_tasks = 0, total_steals = 0;
+  for (int i = 0; i < streams; i++) {
+    ABT_pool pool = pools[i];
+    pool_t *p_pool;
+    ABT_pool_get_data(pool, (void **)&p_pool);
+    total_tasks += p_pool->task_count;
+    total_steals += p_pool->task_stolen;
+    fprintf(stdout, "ARGOLIB_INDPOOLCNT pool %d taskCount %ld stealCount %ld\n",
+            get_user_pool_rank(pool), p_pool->task_count, p_pool->task_stolen);
+  }
+  fprintf(stdout, "ARGOLIB_TOTPOOLCNT threads %d taskCount %ld stealCount %ld ratio %0.3lf\n",
+          streams, total_tasks, total_steals, ((double)(total_steals) / total_tasks));
+
   ABT_finalize();
 
   /* Free allocated memory. */
@@ -71,19 +86,20 @@ void argolib_kernel(fork_t fptr, void *args) {
   fptr(args);
 
   finish = 1;
-  printf("Task count :%d\n", counter);
   double t2 = ABT_get_wtime();
-  printf("elapsed time: %.3f \n", (t2 - t1) * 1.0e3);
+  fprintf(stdout, "ARGOLIB_ELAPSEDTIME: %.3f \n", (t2 - t1) * 1.0e3);
 }
 
 Task_handle *argolib_fork(fork_t fptr, void *args) {
-
-  counter++;
 
   int rank;
   ABT_xstream_self_rank(&rank);
   ABT_pool target_pool = pools[rank];
   ABT_thread *child = (ABT_thread *)malloc(sizeof(ABT_thread *));
+
+  pool_t *p_pool;
+  ABT_pool_get_data(target_pool, (void **)&p_pool);
+  (p_pool->task_count)++;
 
   int x =
       ABT_thread_create(target_pool, fptr, args, ABT_THREAD_ATTR_NULL, child);
@@ -136,26 +152,21 @@ void sched_run_1(ABT_sched sched) {
   while (1) {
 
     ABT_thread thread;
-    ABT_unit unit;
-    ABT_pool_pop(pool[0], &unit);
-    ABT_unit_get_thread(unit, &thread);
 
-    if (thread != ABT_THREAD_NULL) {
-
+    int pop_stat = ABT_pool_pop_thread(pool[0], &thread);
+    assert(pop_stat == ABT_SUCCESS);
+    if (pop_stat == ABT_SUCCESS && thread != ABT_THREAD_NULL) {
       ABT_self_schedule(thread, pool[0]);
 
     } else {
       target_pool = rand() % streams;
 
-      ABT_pool_pop(pools[target_pool], &unit);
-      ABT_unit_get_thread(unit, &thread);
-
-      if (thread != ABT_THREAD_NULL) {
-
-        ABT_pool_push(pool[0], unit);
+      if ((ABT_pool_pop_thread_ex(pools[target_pool], &thread,
+                                  ABT_POOL_CONTEXT_OWNER_SECONDARY) ==
+           ABT_SUCCESS) &&
+          (thread != ABT_THREAD_NULL)) {
+        ABT_self_schedule(thread, pool[0]);
       }
-
-      // printf("stolen task\n");
     }
 
     if (finish == 1) {
@@ -227,11 +238,13 @@ ABT_thread pool_pop_1(ABT_pool pool, ABT_pool_context tail) {
   pool_t *p_pool;
   ABT_pool_get_data(pool, (void **)&p_pool);
   unit_t *p_unit = NULL;
+  int own_pool = !(tail == ABT_POOL_CONTEXT_OWNER_SECONDARY);
 
-  if (!(tail & ABT_POOL_CONTEXT_OWNER_SECONDARY)) {
+  if (own_pool) {
 
-    if (p_pool->p_head == NULL)
+    if (p_pool->p_head == NULL) {
       return ABT_THREAD_NULL;
+    }
 
     if (p_pool->p_head == p_pool->p_tail) {
       // Only one thread.
@@ -248,12 +261,17 @@ ABT_thread pool_pop_1(ABT_pool pool, ABT_pool_context tail) {
 
     pthread_mutex_lock(&p_pool->lock);
 
-    if (p_pool->p_head == NULL)
+    // Don't steal in case of 0 or 1 task
+    if (p_pool->p_head == p_pool->p_tail) {
+      pthread_mutex_unlock(&p_pool->lock);
       return ABT_THREAD_NULL;
+    }
 
     // Pop from the head.
     p_unit = p_pool->p_head;
     p_pool->p_head = p_unit->p_prev;
+
+    (p_pool->task_stolen)++;
 
     pthread_mutex_unlock(&p_pool->lock);
   }
@@ -320,4 +338,23 @@ void create_pools_1(int num, ABT_pool *pools) {
 
   ABT_pool_user_def_free(&def);
   ABT_pool_config_free(&config);
+}
+
+static int get_user_pool_rank(ABT_pool pool) {
+  int pool_idx = 0;
+  // TODO: Use pointer arithmetic
+  for (; pool_idx < streams; pool_idx++) {
+    if (pools[pool_idx] == pool)
+      break;
+  }
+  if (pool_idx == streams) {
+    fprintf(stderr, "ARGOLIB_POOLIDNOTFOUND pool %p streams %d\n", pool,
+            streams);
+    pool_idx = -1;
+    for (pool_idx = 0; pool_idx < streams; pool_idx++)
+      fprintf(stderr, "ARGOLIB_POOL pool %p idx %d\n", pools[pool_idx],
+              pool_idx);
+    assert(0);
+  }
+  return pool_idx;
 }
