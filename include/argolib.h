@@ -12,6 +12,7 @@ static ABT_pool *pools = NULL;
 static ABT_sched *scheds = NULL;
 static int *active=NULL;
 static int counter = 0;
+static int steal_counter=0;
 static int finish = 0;
 static int pool_id = 0;
 static int wactive;

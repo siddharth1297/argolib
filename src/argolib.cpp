@@ -12,8 +12,9 @@ void awake_argolib_workers(int w){
      ABT_pool_get_data(pools[i], (void **)&p_pool);
 
      if(p_pool->active==0) {
-
-      printf("Xstream number %d is going to be awaken\n",i);
+#ifdef DEBUG
+      fprintf("Xstream number %d is going to be awaken\n",i);
+#endif
       pthread_mutex_lock(&p_pool->active_lock);
       p_pool->active=1;
 
@@ -44,8 +45,9 @@ void sleep_argolib_workers(int w){
      ABT_pool_get_data(pools[i], (void **)&p_pool);
 
      if(p_pool->active==1) {
-
-      printf("Xstream number %d is going to sleep\n",i);
+#ifdef DEBUG
+      fprintf("Xstream number %d is going to sleep\n",i);
+#endif
       p_pool->active=0;
       w--;
      }
@@ -173,7 +175,7 @@ void argolib_init(int argc, char **argv) {
   if (streams <= 0)
     streams = 1;
 
-  printf("No of streams = %d\n", streams);
+  fprintf(stdout, "ARGOLIB_NUMSTREAMS NUMSTREAMS %d\n",streams);
 
    wactive=streams;
 
@@ -187,7 +189,8 @@ void argolib_init(int argc, char **argv) {
   for(int i=0;i<streams;i++) active[i]=1;
 
 
-  printf("Starting with Mode: RAND_WS\n");
+  fprintf(stdout, "ARGOLIB_MODE MODE RAND_WS\n");
+
   /* Create pools */
   create_pools_1(streams, pools);
   /* Create schedulers */
@@ -239,20 +242,37 @@ void argolib_init(int argc, char **argv) {
 
 void argolib_finalize() {
 
-  //printf("value of finish in finalise function is %d\n",finish);
-  printf("Finalise function\n");
+  
+
+ 
   
   for (int i = 1; i < streams; i++) {
-    printf("Xstream end\n");
-    //ABT_xstream_join(xstreams[i]);
+    
     int x=ABT_xstream_join(xstreams[i]);
     assert(x==ABT_SUCCESS);
     ABT_xstream_free(&xstreams[i]);
   }
 
-  printf("xstreams have finished\n");
+ 
   pthread_join(profiler_thread,NULL);
-  printf("profiler thread\n");
+
+  
+
+  for(int i=0;i<streams;i++){
+
+    pool_energy_t *p_pool;
+
+    ABT_pool_get_data(pools[i], (void **)&p_pool);
+
+    fprintf(stdout, "ARGOLIB_INDPOOLCNT pool %d taskCount %d stealCount %d\n",
+            get_user_pool_rank(pools[i]), p_pool->task_count, p_pool->task_stolen);
+
+    counter+=p_pool->task_count;
+    steal_counter+=p_pool->task_stolen;
+  }
+
+  fprintf(stdout, "ARGOLIB_TOTPOOLCNT taskCount %d stealCount %d\n", counter, steal_counter);
+  
 
   ABT_finalize();
   /* Free allocated memory. */
@@ -267,20 +287,23 @@ void argolib_kernel(fork_t fptr, void *args) {
   fptr(args);
 
   finish = 1;
-  printf("value of finish in kernel is %d\n",finish);
-  printf("Task count :%d\n", counter);
+ 
+  //printf("Task count :%d\n", counter);
   double t2 = ABT_get_wtime();
-  printf("elapsed time: %.3f \n", (t2 - t1) * 1.0e3);
+ // printf("elapsed time: %.3f \n", (t2 - t1) * 1.0e3);
+  fprintf(stdout, "ARGOLIB_ELAPSEDTIME: %.3f\n",(t2 - t1) * 1.0e3);
 }
 
 Task_handle *argolib_fork(fork_t fptr, void *args) {
 
-  counter++;
+  pool_energy_t *p_pool;
 
   int rank;
   ABT_xstream_self_rank(&rank);
   ABT_pool target_pool = pools[rank];
+  ABT_pool_get_data(target_pool, (void **)&p_pool);
   ABT_thread *child = (ABT_thread *)malloc(sizeof(ABT_thread *));
+  p_pool->task_count+=1;
 
   int x =
       ABT_thread_create(target_pool, fptr, args, ABT_THREAD_ATTR_NULL, child);
@@ -313,7 +336,7 @@ void argolib_join(Task_handle **list, int size) {
 
 int sched_init_1(ABT_sched sched, ABT_sched_config config) {
 
-  printf("Sched init\n");
+ 
 
   sched_data_t *p_data = (sched_data_t *)calloc(1, sizeof(sched_data_t));
 
@@ -362,8 +385,7 @@ void sched_run_1(ABT_sched sched) {
     
     if (pop_stat == ABT_SUCCESS && thread != ABT_THREAD_NULL) {
 
-      // if(finish==1)
-      //   printf("own pool\n");
+      
     
       ABT_self_schedule(thread, pool[0]);
 
@@ -380,23 +402,21 @@ void sched_run_1(ABT_sched sched) {
                                       ABT_POOL_CONTEXT_OWNER_SECONDARY) ==
                ABT_SUCCESS) &&
               (thread != ABT_THREAD_NULL)) {
-              // if(finish==1) printf("work stealing\n");
+             
 
         //ABT_pool_push(pool[0], unit);
+        p_pool->task_stolen+=1;
         ABT_self_schedule(thread, pool[0]);
-      //printf("stolen task\n");
+      
       }
 
-      // else{
-      //   if(finish==1) printf("No task for ws\n");
-      // }
+      
     }
 
     if (finish == 1) {
-      //printf("value of finish in sched is %d\n",finish);
+      
       assert(ABT_sched_exit(sched)==ABT_SUCCESS);
-      //printf("break\n");
-     // assert(x==ABT_SUCCESS);
+      
       
       break;
     }
@@ -406,14 +426,14 @@ void sched_run_1(ABT_sched sched) {
     }
 
   
-    //printf("finish is %d\n",finish);
+    
   }
   free(pool);
 }
 
 int sched_free_1(ABT_sched sched) {
 
-  printf("sched free\n");
+ 
 
   sched_data_t *p_data;
 

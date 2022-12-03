@@ -50,6 +50,8 @@ typedef struct pool_energy {
   unit_t *p_head;
   unit_t *p_tail;
   int active;
+  int task_count;
+  int task_stolen;
 } pool_energy_t;
 
 struct {
