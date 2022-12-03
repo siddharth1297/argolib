@@ -13,7 +13,7 @@ static ABT_sched *scheds = NULL;
 static int counter = 0;
 static int finish = 0;
 static int pool_id = 0;
-static int mode = -1; // 0 for normal RAND_WS, 1 for private deque RAND_WS
+static int mode = -1; // 0 for normal RAND_WS
 
 /**
  * Initializes the ArgoLib runtime, and it should be the first thing to call in
@@ -51,22 +51,6 @@ Task_handle *argolib_fork(fork_t fptr, void *args);
 void argolib_join(Task_handle **list, int size);
 
 /* Private functions. Not to be used user */
-
-// Pool functions
-ABT_unit pool_create_unit_2(ABT_pool pool, ABT_thread thread);
-void pool_free_unit_2(ABT_pool pool, ABT_unit unit);
-ABT_bool pool_is_empty_2(ABT_pool pool);
-ABT_thread pool_pop_2(ABT_pool pool, ABT_pool_context tail);
-void pool_push_2(ABT_pool pool, ABT_unit unit, ABT_pool_context c);
-int pool_init_2(ABT_pool pool, ABT_pool_config config);
-void pool_free_2(ABT_pool pool);
-void create_pools_2(int num, ABT_pool *pools);
-
-// scheduler
-int sched_init_2(ABT_sched sched, ABT_sched_config config);
-void sched_run_2(ABT_sched sched);
-int sched_free_2(ABT_sched sched);
-void create_scheds_2(int num, ABT_pool *pools, ABT_sched *scheds);
 
 /******************************************************************************/
 /* Normal RAND_WS                                    */
