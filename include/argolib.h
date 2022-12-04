@@ -68,23 +68,4 @@ void sched_run_2(ABT_sched sched);
 int sched_free_2(ABT_sched sched);
 void create_scheds_2(int num, ABT_pool *pools, ABT_sched *scheds);
 
-/******************************************************************************/
-/* Normal RAND_WS                                    */
-/******************************************************************************/
-
-// scheduler
-int sched_init_1(ABT_sched sched, ABT_sched_config config);
-void sched_run_1(ABT_sched sched);
-int sched_free_1(ABT_sched sched);
-void create_scheds_1(int num, ABT_pool *pools, ABT_sched *scheds);
-
-// Pool functions
-ABT_unit pool_create_unit_1(ABT_pool pool, ABT_thread thread);
-void pool_free_unit_1(ABT_pool pool, ABT_unit unit);
-ABT_bool pool_is_empty_1(ABT_pool pool);
-void pool_push_1(ABT_pool pool, ABT_unit unit, ABT_pool_context c);
-int pool_init_1(ABT_pool pool, ABT_pool_config config);
-void pool_free_1(ABT_pool pool);
-void create_pools_1(int num, ABT_pool *pools);
-
 #endif

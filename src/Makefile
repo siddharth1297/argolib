@@ -6,7 +6,7 @@ ARGOLIB_LIB=$(ARGOLIB_INSTALL_DIR)lib
 # Create lib directory
 $(shell mkdir -p $(ARGOLIB_LIB))
 
-#CFLAGS=-DMODE_PRIVATE_DQ
+CFLAGS=-DMODE_PRIVATE_DQ
 
 libargolib.so: argolib.c
 	gcc -std=c11 $(CFLAGS) -Werror -shared -O3 -fPIC \
