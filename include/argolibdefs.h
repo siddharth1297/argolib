@@ -6,6 +6,7 @@
 
 #include <assert.h>
 #include <pthread.h>
+#include <sched.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -34,12 +35,15 @@ typedef struct request_box {
 
 typedef struct pool_overhead {
   int id;
-  Task_handle *mailbox;
-  int counter;
+  Task_handle *mailbox; // Store tasks
+  int counter;          // Shared counter
   request_box_t *rb;
   unit_t *p_head;
   unit_t *p_tail;
   int wu; // work units in the pool
+  size_t task_count;
+  size_t task_stolen;
+  int transfer_task;
 } pool_overhead_t;
 
 #endif

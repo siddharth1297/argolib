@@ -10,7 +10,6 @@ static int streams = 0;
 static ABT_xstream *xstreams = NULL;
 static ABT_pool *pools = NULL;
 static ABT_sched *scheds = NULL;
-static int counter = 0;
 static int finish = 0;
 static int pool_id = 0;
 static int mode = -1; // 0 for normal RAND_WS, 1 for private deque RAND_WS
