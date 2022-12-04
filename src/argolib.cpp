@@ -3,80 +3,70 @@
  */
 #include "argolib.h"
 
-void awake_argolib_workers(int w){
+void awake_argolib_workers(int w) {
 
-  for(int i=1;i<streams &&w>0;i++){
+  for (int i = 1; i < streams && w > 0; i++) {
 
     pool_energy_t *p_pool;
 
-     ABT_pool_get_data(pools[i], (void **)&p_pool);
+    ABT_pool_get_data(pools[i], (void **)&p_pool);
 
-     if(p_pool->active==0) {
+    if (p_pool->active == 0) {
 #ifdef DEBUG
-      fprintf("Xstream number %d is going to be awaken\n",i);
+      fprintf(stdout, "ARGOLIB_XSTREAMSTAT num %d status tobeawaken\n", i);
 #endif
       pthread_mutex_lock(&p_pool->active_lock);
-      p_pool->active=1;
-
-      
-      
+      p_pool->active = 1;
       pthread_mutex_unlock(&p_pool->active_lock);
       pthread_cond_signal(&p_pool->cond);
 
-
       w--;
-     }
-
-     //free(p_pool);
-
-
+    }
   }
-
 }
 
-void sleep_argolib_workers(int w){
+void sleep_argolib_workers(int w) {
 
- 
-
-  for(int i=1;i<streams &&w>0;i++){
+  for (int i = 1; i < streams && w > 0; i++) {
 
     pool_energy_t *p_pool;
 
-     ABT_pool_get_data(pools[i], (void **)&p_pool);
+    ABT_pool_get_data(pools[i], (void **)&p_pool);
 
-     if(p_pool->active==1) {
+    if (p_pool->active == 1) {
 #ifdef DEBUG
-      fprintf("Xstream number %d is going to sleep\n",i);
+      fprintf(stdout, "ARGOLIB_XSTREAMSTAT num %d status sleep\n", i);
 #endif
-      p_pool->active=0;
+      p_pool->active = 0;
       w--;
-     }
-
-     //free(p_pool);
-
-
+    }
   }
 }
 
-void* daemon_profiler(void *arg){
+void *daemon_profiler(void *arg) {
 
- // const int fixed_interval= 20ms; //20 ms
+  // Bind to CPU 0
+  cpu_set_t cpuset;
+  CPU_ZERO(&cpuset);
+  CPU_SET(0, &cpuset);
+  pthread_t current_thread = pthread_self();
+  assert(pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &cpuset) ==
+         0);
 
-  std::this_thread::sleep_for(std::chrono::seconds(1)); //warmup
+  // const int fixed_interval= 20ms; //20 ms
 
-  double JPI_prev=0;
+  std::this_thread::sleep_for(std::chrono::seconds(1)); // warmup
 
-  while(finish==0){
+  double JPI_prev = 0;
 
-   // continue;
+  while (finish == 0) {
 
-    
-     ___after_sstate = pcm::getSystemCounterState();
-    double JPI_curr=getConsumedJoules(___before_sstate, ___after_sstate);
-    
-    configure_DOP(JPI_prev,JPI_curr);
-    JPI_prev=JPI_curr;
-    
+    ___after_sstate = pcm::getSystemCounterState();
+    double JPI_curr = getConsumedJoules(___before_sstate, ___after_sstate);
+
+    configure_DOP(JPI_prev, JPI_curr);
+    JPI_prev = JPI_curr;
+
     std::this_thread::sleep_for(std::chrono::milliseconds(20));
     ___before_sstate = pcm::getSystemCounterState();
   }
@@ -85,64 +75,64 @@ void* daemon_profiler(void *arg){
   return NULL;
 }
 
-void configure_DOP( double JPI_prev,double JPI_curr){
+void configure_DOP(double JPI_prev, double JPI_curr) {
 
-  
-   int wchange=0;
+  int wchange = 0;
 
-  if(first_configureDOP==1){
+  if (first_configureDOP == 1) {
 
-    first_configureDOP=0;
-   
-   wchange=wactive/2;
+    first_configureDOP = 0;
+
+    wchange = wactive / 2;
     sleep_argolib_workers(wchange);
-    wactive=wchange;
-    lastAction=0;
+    wactive = wchange;
+    lastAction = 0;
     return;
   }
 
-  if(JPI_curr<JPI_prev){
+  if (JPI_curr < JPI_prev) {
 
-    if(lastAction==0){
-      
-      wchange=wactive/2;
-      if(wactive<=wchange) return;
-      wactive-=wchange;
-      
+    if (lastAction == 0) {
+
+      wchange = wactive / 2;
+      if (wactive <= wchange)
+        return;
+      wactive -= wchange;
+
       sleep_argolib_workers(wchange);
     }
 
-    else{ 
-      
-      wchange=(streams+wactive)>>1;
-      if(wactive-wchange>streams) return;
-      wactive+=wchange;
-      awake_argolib_workers(wchange);  
-    }  
+    else {
+
+      wchange = (streams + wactive) >> 1;
+      if (wactive - wchange > streams)
+        return;
+      wactive += wchange;
+      awake_argolib_workers(wchange);
+    }
   }
 
-  else{
+  else {
 
-    if(lastAction==0){
-      wchange=(streams+wactive)>>1;
-      if(wactive-wchange>streams) return;
-      wactive+=wchange;
-      awake_argolib_workers(wchange);  
-      lastAction=1;
+    if (lastAction == 0) {
+      wchange = (streams + wactive) >> 1;
+      if (wactive - wchange > streams)
+        return;
+      wactive += wchange;
+      awake_argolib_workers(wchange);
+      lastAction = 1;
     }
 
-    else{
+    else {
 
-      wchange=wactive/2;
-      if(wactive<=wchange) return;
-      wactive-=wchange;
+      wchange = wactive / 2;
+      if (wactive <= wchange)
+        return;
+      wactive -= wchange;
       sleep_argolib_workers(wchange);
-      lastAction=0;
-
+      lastAction = 0;
     }
   }
-
-
 }
 
 static int get_user_pool_rank(ABT_pool pool) {
@@ -175,19 +165,17 @@ void argolib_init(int argc, char **argv) {
   if (streams <= 0)
     streams = 1;
 
-  fprintf(stdout, "ARGOLIB_NUMSTREAMS NUMSTREAMS %d\n",streams);
+  fprintf(stdout, "ARGOLIB_NUMSTREAMS NUMSTREAMS %d\n", streams);
 
-   wactive=streams;
-
+  wactive = streams;
 
   /* Allocate memory. */
   xstreams = (ABT_xstream *)malloc(sizeof(ABT_xstream) * streams);
   pools = (ABT_pool *)malloc(sizeof(ABT_pool) * streams);
   scheds = (ABT_sched *)malloc(sizeof(ABT_sched) * streams);
-  active=(int *)malloc(sizeof(int)*streams);
+  // active=(int *)malloc(sizeof(int)*streams);
 
-  for(int i=0;i<streams;i++) active[i]=1;
-
+  // for(int i=0;i<streams;i++) active[i]=1;
 
   fprintf(stdout, "ARGOLIB_MODE MODE RAND_WS\n");
 
@@ -209,76 +197,65 @@ void argolib_init(int argc, char **argv) {
   cpu_set_t cpuset;
   CPU_ZERO(&cpuset);
   CPU_SET(0, &cpuset);
+  pthread_t current_thread = pthread_self();
+  assert(pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &cpuset) ==
+         0);
 
-  //TODO: Make _GNU_SOURCE work for Cpp
-  pthread_create(&profiler_thread,NULL,&daemon_profiler,NULL);
+  // TODO: Make _GNU_SOURCE work for Cpp
+  pthread_create(&profiler_thread, NULL, &daemon_profiler, NULL);
   pthread_setaffinity_np(profiler_thread, sizeof(cpu_set_t), &cpuset);
 
-    ___pcm = pcm::PCM::getInstance();
-        ___pcm->resetPMU();
-    // program() creates common semaphore for the singleton, so ideally to be called before any other references to PCM
-    pcm::PCM::ErrorCode status = ___pcm->program();
+  ___pcm = pcm::PCM::getInstance();
+  ___pcm->resetPMU();
+  // program() creates common semaphore for the singleton, so ideally to be
+  // called before any other references to PCM
+  pcm::PCM::ErrorCode status = ___pcm->program();
 
-    switch (status)
-    {
-    case pcm::PCM::Success:
-        //std::cerr << "Success initializing PCM" << std::endl;
-        break;
-    case pcm::PCM::MSRAccessDenied:
-        fprintf(stderr, "Access to Processor Counter Monitor has denied (no MSR or PCI CFG space access)./n");
-        exit(EXIT_FAILURE);
-    case pcm::PCM::PMUBusy:
-        fprintf(stderr, "Access to Processor Counter Monitor has denied (Performance Monitoring Unit is occupied by other application). Try to stop the application that uses PMU.\n");
-        fprintf(stderr, "Alternatively you can try running PCM with option -r to reset PMU configuration at your own risk.\n");
-        exit(EXIT_FAILURE);
-    default:
-        fprintf(stderr, "Access to Processor Counter Monitor has denied (Unknown error).\n");
-        exit(EXIT_FAILURE);
-    }
-
-  
-
+  switch (status) {
+  case pcm::PCM::Success:
+    // std::cerr << "Success initializing PCM" << std::endl;
+    break;
+  case pcm::PCM::MSRAccessDenied:
+    fprintf(stderr, "Access to Processor Counter Monitor has denied (no MSR or "
+                    "PCI CFG space access)./n");
+    exit(EXIT_FAILURE);
+  case pcm::PCM::PMUBusy:
+    fprintf(stderr,
+            "Access to Processor Counter Monitor has denied (Performance "
+            "Monitoring Unit is occupied by other application). Try to stop "
+            "the application that uses PMU.\n");
+    fprintf(stderr, "Alternatively you can try running PCM with option -r to "
+                    "reset PMU configuration at your own risk.\n");
+    exit(EXIT_FAILURE);
+  default:
+    fprintf(
+        stderr,
+        "Access to Processor Counter Monitor has denied (Unknown error).\n");
+    exit(EXIT_FAILURE);
+  }
 }
 
 void argolib_finalize() {
 
-  
-
- 
-  
   for (int i = 1; i < streams; i++) {
-    
-    int x=ABT_xstream_join(xstreams[i]);
-    assert(x==ABT_SUCCESS);
+
+    int x = ABT_xstream_join(xstreams[i]);
+    assert(x == ABT_SUCCESS);
     ABT_xstream_free(&xstreams[i]);
   }
 
- 
-  pthread_join(profiler_thread,NULL);
+  pthread_join(profiler_thread, NULL);
 
-  
-
-  for(int i=0;i<streams;i++){
-
-    pool_energy_t *p_pool;
-
-    ABT_pool_get_data(pools[i], (void **)&p_pool);
-
-    fprintf(stdout, "ARGOLIB_INDPOOLCNT pool %d taskCount %d stealCount %d\n",
-            get_user_pool_rank(pools[i]), p_pool->task_count, p_pool->task_stolen);
-
-    counter+=p_pool->task_count;
-    steal_counter+=p_pool->task_stolen;
+  for (int i = 1; i < streams; i++) {
+    ABT_sched_free((&scheds[i]));
   }
-
-  fprintf(stdout, "ARGOLIB_TOTPOOLCNT taskCount %d stealCount %d\n", counter, steal_counter);
-  
 
   ABT_finalize();
   /* Free allocated memory. */
   free(xstreams);
   free(pools);
   free(scheds);
+  // free(active);
 }
 
 void argolib_kernel(fork_t fptr, void *args) {
@@ -287,23 +264,36 @@ void argolib_kernel(fork_t fptr, void *args) {
   fptr(args);
 
   finish = 1;
- 
-  //printf("Task count :%d\n", counter);
+
   double t2 = ABT_get_wtime();
- // printf("elapsed time: %.3f \n", (t2 - t1) * 1.0e3);
-  fprintf(stdout, "ARGOLIB_ELAPSEDTIME: %.3f\n",(t2 - t1) * 1.0e3);
+  fprintf(stdout, "ARGOLIB_ELAPSEDTIME: %.3f\n", (t2 - t1) * 1.0e3);
+
+  size_t total_tasks = 0, total_steals = 0;
+  for (int i = 0; i < streams; i++) {
+    ABT_pool pool = pools[i];
+    pool_energy_t *p_pool;
+    ABT_pool_get_data(pool, (void **)&p_pool);
+    total_tasks += p_pool->task_count;
+    total_steals += p_pool->task_stolen;
+    printf("ARGOLIB_INDPOOLCNT pool %d taskCount %ld stealCount %ld\n", i,
+           p_pool->task_count, p_pool->task_stolen);
+  }
+  printf("ARGOLIB_TOTPOOLCNT threads %d taskCount %ld stealCount %ld ratio "
+         "%0.3lf\n",
+         streams, total_tasks, total_steals,
+         ((double)(total_steals) / total_tasks));
 }
 
 Task_handle *argolib_fork(fork_t fptr, void *args) {
 
-  pool_energy_t *p_pool;
-
   int rank;
   ABT_xstream_self_rank(&rank);
   ABT_pool target_pool = pools[rank];
-  ABT_pool_get_data(target_pool, (void **)&p_pool);
   ABT_thread *child = (ABT_thread *)malloc(sizeof(ABT_thread *));
-  p_pool->task_count+=1;
+  assert(child != NULL);
+  pool_energy_t *p_pool;
+  ABT_pool_get_data(target_pool, (void **)&p_pool);
+  (p_pool->task_count)++;
 
   int x =
       ABT_thread_create(target_pool, fptr, args, ABT_THREAD_ATTR_NULL, child);
@@ -312,7 +302,6 @@ Task_handle *argolib_fork(fork_t fptr, void *args) {
 }
 
 void argolib_join(Task_handle **list, int size) {
-
   // ABT_thread_join_many() is deprecated.
   // https://www.argobots.org/doxygen/latest/d0/d6d/group__ULT.html#ga7c23f76b44d29ec70a18759ba019b050
 
@@ -327,16 +316,11 @@ void argolib_join(Task_handle **list, int size) {
   }
 }
 
-
-
-
 /******************************************************************************/
 /* Normal RAND_WS                                    */
 /******************************************************************************/
 
 int sched_init_1(ABT_sched sched, ABT_sched_config config) {
-
- 
 
   sched_data_t *p_data = (sched_data_t *)calloc(1, sizeof(sched_data_t));
 
@@ -348,6 +332,16 @@ int sched_init_1(ABT_sched sched, ABT_sched_config config) {
 
 void sched_run_1(ABT_sched sched) {
 
+  int rank;
+  ABT_xstream_self_rank(&rank);
+  if (rank != 0) {
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(rank, &cpuset);
+    pthread_t current_thread = pthread_self();
+    assert(pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &cpuset) ==
+           0);
+  }
   int work_count = 0;
   sched_data_t *p_data;
   ABT_pool *pool;
@@ -359,82 +353,47 @@ void sched_run_1(ABT_sched sched) {
   pool = (ABT_pool *)malloc(1 * sizeof(ABT_pool));
   ABT_sched_get_pools(sched, 1, 0, pool);
   ABT_pool_get_data(pool[0], (void **)&p_pool);
-  
+
   while (1) {
 
-    if(p_pool->active==0) {
-
+    if (p_pool->active == 0) {
       pthread_mutex_lock(&p_pool->active_lock);
       pthread_cond_wait(&p_pool->cond, &p_pool->active_lock);
-      pthread_mutex_unlock(&p_pool->active_lock); //TEST
-     //continue;
+      pthread_mutex_unlock(&p_pool->active_lock);
     }
 
-
-
     ABT_thread thread;
-    //ABT_unit unit;
-    //ABT_pool_pop(pool[0], &unit);
-    //ABT_unit_get_thread(unit, &thread);
 
-    //if (thread != ABT_THREAD_NULL) {
-
-    
     int pop_stat = ABT_pool_pop_thread(pool[0], &thread);
     assert(pop_stat == ABT_SUCCESS);
-    
     if (pop_stat == ABT_SUCCESS && thread != ABT_THREAD_NULL) {
-
-      
-    
       ABT_self_schedule(thread, pool[0]);
 
     } else {
       target_pool = rand() % streams;
 
-     
-      
-      /*
-      ABT_pool_pop(pools[target_pool], &unit);
-      ABT_unit_get_thread(unit, &thread);
-      */
       if ((ABT_pool_pop_thread_ex(pools[target_pool], &thread,
-                                      ABT_POOL_CONTEXT_OWNER_SECONDARY) ==
-               ABT_SUCCESS) &&
-              (thread != ABT_THREAD_NULL)) {
-             
-
-        //ABT_pool_push(pool[0], unit);
-        p_pool->task_stolen+=1;
+                                  ABT_POOL_CONTEXT_OWNER_SECONDARY) ==
+           ABT_SUCCESS) &&
+          (thread != ABT_THREAD_NULL)) {
         ABT_self_schedule(thread, pool[0]);
-      
       }
-
-      
     }
 
     if (finish == 1) {
-      
-      assert(ABT_sched_exit(sched)==ABT_SUCCESS);
-      
-      
+      assert(ABT_sched_exit(sched) == ABT_SUCCESS);
       break;
     }
+
     if (++work_count >= p_data->event_freq) {
       work_count = 0;
       ABT_xstream_check_events(sched);
     }
-
-  
-    
   }
   free(pool);
 }
 
 int sched_free_1(ABT_sched sched) {
-
- 
-
   sched_data_t *p_data;
 
   ABT_sched_get_data(sched, (void **)&p_data);
@@ -470,21 +429,11 @@ ABT_unit pool_create_unit_1(ABT_pool pool, ABT_thread thread) {
   if (!p_unit)
     return ABT_UNIT_NULL;
   p_unit->thread = thread;
-#ifdef DEBUG
-  ABT_unit_id thread_id;
-  assert(ABT_thread_get_id(thread, &thread_id) == ABT_SUCCESS);
-  printf("Created ThreadId: %ld pool: %d\n", thread_id, get_user_pool_rank(pool));
-#endif
   return (ABT_unit)p_unit;
 }
 
 void pool_free_unit_1(ABT_pool pool, ABT_unit unit) {
   unit_t *p_unit = (unit_t *)unit;
-#ifdef DEBUG
-  ABT_unit_id thread_id;
-  assert(ABT_thread_get_id(p_unit->thread, &thread_id) == ABT_SUCCESS);
-  printf("Finished ThreadId: %ld pool: %d\n", thread_id, get_user_pool_rank(pool));
-#endif
   free(p_unit);
 }
 
@@ -500,10 +449,8 @@ ABT_thread pool_pop_1(ABT_pool pool, ABT_pool_context tail) {
   ABT_pool_get_data(pool, (void **)&p_pool);
   unit_t *p_unit = NULL;
   int own_pool = !(tail == ABT_POOL_CONTEXT_OWNER_SECONDARY);
-  
-  //if (!(tail & ABT_POOL_CONTEXT_OWNER_SECONDARY)) {
+
   if (own_pool) {
-	  // TODO: Remove it after fixing crash issue
     pthread_mutex_lock(&p_pool->lock);
 
     if (p_pool->p_head == NULL) {
@@ -524,22 +471,19 @@ ABT_thread pool_pop_1(ABT_pool pool, ABT_pool_context tail) {
     pthread_mutex_unlock(&p_pool->lock);
 
   } else {
-	// TODO: Set granularity after fixing crash
     pthread_mutex_lock(&p_pool->lock);
 
-    // If only one thread or no thread
-    if (p_pool->p_head == NULL) {
-      pthread_mutex_unlock(&p_pool->lock);
-      return ABT_THREAD_NULL;
-     }
+    // Don't steal in case of 0 or 1 task
     if (p_pool->p_head == p_pool->p_tail) {
       pthread_mutex_unlock(&p_pool->lock);
       return ABT_THREAD_NULL;
-     }
+    }
 
     // Pop from the head.
     p_unit = p_pool->p_head;
     p_pool->p_head = p_unit->p_prev;
+
+    (p_pool->task_stolen)++;
 
     pthread_mutex_unlock(&p_pool->lock);
   }
@@ -554,6 +498,7 @@ void pool_push_1(ABT_pool pool, ABT_unit unit, ABT_pool_context c) {
   ABT_pool_get_data(pool, (void **)&p_pool);
   unit_t *p_unit = (unit_t *)unit;
 
+  // pthread_mutex_lock(&p_pool->lock);
   if (p_pool->p_tail) {
     p_unit->p_next = p_pool->p_tail;
     p_pool->p_tail->p_prev = p_unit;
@@ -561,6 +506,7 @@ void pool_push_1(ABT_pool pool, ABT_unit unit, ABT_pool_context c) {
     p_pool->p_head = p_unit;
   }
   p_pool->p_tail = p_unit;
+  // pthread_mutex_unlock(&p_pool->lock);
 }
 
 int pool_init_1(ABT_pool pool, ABT_pool_config config) {
@@ -569,13 +515,13 @@ int pool_init_1(ABT_pool pool, ABT_pool_config config) {
     return ABT_ERR_MEM;
 
   int ret = pthread_mutex_init(&p_pool->lock, 0);
-  int ret2= pthread_mutex_init(&p_pool->active_lock,0);
+  int ret2 = pthread_mutex_init(&p_pool->active_lock, 0);
   int ret3 = pthread_cond_init(&p_pool->cond, 0);
-  if (ret != 0 || ret2!=0 || ret3!=0) {
+  if (ret != 0 || ret2 != 0 || ret3 != 0) {
     free(p_pool);
     return ABT_ERR_SYS;
   }
-  p_pool->active=1;
+  p_pool->active = 1;
   ABT_pool_set_data(pool, (void *)p_pool);
   return ABT_SUCCESS;
 }
