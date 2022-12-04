@@ -99,9 +99,7 @@ void argolib_kernel(fork_t fptr, void *args) {
     pool_overhead_t *p_pool;
     ABT_pool_get_data(pool, (void **)&p_pool);
     if (p_pool->rb->thief_id != -1) {
-
       p_pool->rb->thief_id = -1;
-      assert(0);
       pthread_cond_signal(&p_pool->rb->cond);
     }
   }
@@ -335,7 +333,6 @@ void sched_run_2(ABT_sched sched) {
     int isBoxFull = (p_pool->rb->thief_id != -1);
     p_pool->transfer_task = isBoxFull;
     int pop_stat = (ABT_pool_pop(pool[0], &unit) == ABT_SUCCESS);
-    assert(unit != NULL);
     pop_stat = pop_stat && (ABT_unit_get_thread(unit, &thread) == ABT_SUCCESS);
     pop_stat = pop_stat && (thread != ABT_THREAD_NULL);
     p_pool->transfer_task = 0;
