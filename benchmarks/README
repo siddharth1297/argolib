@@ -1,0 +1,25 @@
+You should not change anything inside these benchmarks for carrying out the experiments.
+
+To summarize, these are the experiments you have to perform:
+(1) Argolib (Deadline-1, Part-1): Four benchmarks.
+(2) Any TWO optimzations from Deadline-1-Part-2 OR Deadline-2 OR Deadline-3. 
+    If its Deadline-1-Part-2 then Fib and QuickSort benchmarks.
+    If its Deadline-2 then iterative averaging if you implemented trace/replay, or quicksort if you implemented Hierarchical Work-Stealing (HWS).
+    If its Deadline-3 then QuickSort benchmark.
+
+You should report the execution time as an average of five invocations in each experiment. 
+
+What are the experiments that you have to report based on the optimizations you choose:
+
+(a) Speedup over the sequential execution of each benchmark for worker count 20 only.
+(b) Total tasks created and total tasks stolen.
+
+---------------------
+Building benchmarks:
+---------------------
+
+Sequential version of all four benchmarks are inside the directory "sequential", and the parallel versions inside the directory "parallel".
+Both these directories contain Makefile. You won't require any changes in sequential/Makefile, but you would have to set the variables
+ARGOLIB_CXXFLAGS, ARGOLIB_LDFLAGS, and ARGOLIB_LDLIBS inside parallel/Makefile. Feel free to update the parallel/Makefile to suite your 
+runtime implementation. However, you must use -O3 switch.
+
