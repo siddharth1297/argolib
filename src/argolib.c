@@ -1,6 +1,7 @@
 /*
  * Header file for argolib C interfaces.
  */
+#define _GNU_SOURCE
 #include "argolib.h"
 
 static int get_user_pool_rank(ABT_pool pool);
@@ -29,7 +30,7 @@ void argolib_init(int argc, char **argv) {
   xstreams = (ABT_xstream *)malloc(sizeof(ABT_xstream) * streams);
   pools = (ABT_pool *)malloc(sizeof(ABT_pool) * streams);
   scheds = (ABT_sched *)malloc(sizeof(ABT_sched) * streams);
-
+  
   if (mode == 0) {
     fprintf(stdout, "ARGOLIB_MODE MODE RAND_WS\n");
     /* Create pools */
@@ -40,16 +41,25 @@ void argolib_init(int argc, char **argv) {
     fprintf(stderr, "ARGOLIB_MODE MODE INCORRECT\n");
     assert(0);
   }
+  cpu_set_t cpuset;
+  CPU_ZERO(&cpuset);
+  CPU_SET(0, &cpuset);
+pthread_t current_thread = pthread_self();    
+   assert(pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &cpuset) == 0);
 
   /* Set up a primary execution stream. */
   ABT_xstream_self(&xstreams[0]);
 
   ABT_xstream_set_main_sched(xstreams[0], scheds[0]); // scheds[0]
-
+	printf("self scheduling done\n");
   /* Create secondary execution streams. */
   for (int i = 1; i < streams; i++) {
     ABT_xstream_create(scheds[i], &xstreams[i]);
   }
+  int stat = ABT_xstream_set_cpubind(xstreams[0], 0);
+int id = -1;
+ABT_xstream_get_cpubind(xstreams[0], &id);
+printf("CPUID: %d stat: %d\n", id, stat);
 }
 
 void argolib_finalize() {
@@ -58,19 +68,9 @@ void argolib_finalize() {
     ABT_xstream_join(xstreams[i]);
     ABT_xstream_free(&xstreams[i]);
   }
-
-  size_t total_tasks = 0, total_steals = 0;
-  for (int i = 0; i < streams; i++) {
-    ABT_pool pool = pools[i];
-    pool_t *p_pool;
-    ABT_pool_get_data(pool, (void **)&p_pool);
-    total_tasks += p_pool->task_count;
-    total_steals += p_pool->task_stolen;
-    fprintf(stdout, "ARGOLIB_INDPOOLCNT pool %d taskCount %ld stealCount %ld\n",
-            get_user_pool_rank(pool), p_pool->task_count, p_pool->task_stolen);
-  }
-  fprintf(stdout, "ARGOLIB_TOTPOOLCNT threads %d taskCount %ld stealCount %ld ratio %0.3lf\n",
-          streams, total_tasks, total_steals, ((double)(total_steals) / total_tasks));
+  for (int i = 1; i < streams; i++) {
+        ABT_sched_free((&scheds[i]));
+    }
 
   ABT_finalize();
 
@@ -87,7 +87,26 @@ void argolib_kernel(fork_t fptr, void *args) {
 
   finish = 1;
   double t2 = ABT_get_wtime();
-  fprintf(stdout, "ARGOLIB_ELAPSEDTIME: %.3f \n", (t2 - t1) * 1.0e3);
+  fprintf(stdout, "ARGOLIB_ELAPSEDTIME: %.3f \n", (t2 - t1) * 1.0e3); fflush(stdout);
+
+  size_t total_tasks = 0, total_steals = 0;
+  for (int i = 0; i < streams; i++) {
+    printf("i %d streams %d\n", i, streams);
+    ABT_pool pool = pools[i];
+    pool_t *p_pool; 
+    ABT_pool_get_data(pool, (void **)&p_pool);
+//assert(p_pool != NULL); 
+//printf("Got pool\n");
+    total_tasks += p_pool->task_count;
+    total_steals += p_pool->task_stolen;
+/*printf("Updated\n");
+    printf("ARGOLIB_INDPOOLCNT pool %d taskCount %ld stealCount %ld\n",
+            i, p_pool->task_count, p_pool->task_stolen);
+*/
+  } 
+printf("Done..\n");        
+  printf("ARGOLIB_TOTPOOLCNT threads %d taskCount %ld stealCount %ld ratio %0.3lf\n",
+          streams, total_tasks, total_steals, ((double)(total_steals) / total_tasks));
 }
 
 Task_handle *argolib_fork(fork_t fptr, void *args) {
@@ -95,8 +114,8 @@ Task_handle *argolib_fork(fork_t fptr, void *args) {
   int rank;
   ABT_xstream_self_rank(&rank);
   ABT_pool target_pool = pools[rank];
-  ABT_thread *child = (ABT_thread *)malloc(sizeof(ABT_thread *));
-
+  ABT_thread *child = (ABT_thread *)malloc(sizeof(ABT_thread*));
+  assert(child != NULL);
   pool_t *p_pool;
   ABT_pool_get_data(target_pool, (void **)&p_pool);
   (p_pool->task_count)++;
@@ -108,10 +127,8 @@ Task_handle *argolib_fork(fork_t fptr, void *args) {
 }
 
 void argolib_join(Task_handle **list, int size) {
-
   // ABT_thread_join_many() is deprecated.
   // https://www.argobots.org/doxygen/latest/d0/d6d/group__ULT.html#ga7c23f76b44d29ec70a18759ba019b050
-
   for (int i = 0; i < size; i++) {
     // https://www.argobots.org/doxygen/latest/d0/d6d/group__ULT.html#gaf5275b75a5184bca258e803370e44bea
     int x = ABT_thread_join(*(list[i]));
@@ -139,6 +156,15 @@ int sched_init_1(ABT_sched sched, ABT_sched_config config) {
 
 void sched_run_1(ABT_sched sched) {
 
+  int rank;
+  ABT_xstream_self_rank(&rank);
+  if(rank != 0) {
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(rank, &cpuset);
+    pthread_t current_thread = pthread_self();
+    assert(pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &cpuset) == 0);
+ }
   int work_count = 0;
   sched_data_t *p_data;
   ABT_pool *pool;
@@ -183,7 +209,6 @@ void sched_run_1(ABT_sched sched) {
 }
 
 int sched_free_1(ABT_sched sched) {
-
   sched_data_t *p_data;
 
   ABT_sched_get_data(sched, (void **)&p_data);
@@ -242,7 +267,9 @@ ABT_thread pool_pop_1(ABT_pool pool, ABT_pool_context tail) {
 
   if (own_pool) {
 
+    pthread_mutex_lock(&p_pool->lock);
     if (p_pool->p_head == NULL) {
+    pthread_mutex_unlock(&p_pool->lock);
       return ABT_THREAD_NULL;
     }
 
@@ -256,6 +283,7 @@ ABT_thread pool_pop_1(ABT_pool pool, ABT_pool_context tail) {
       p_unit = p_pool->p_tail;
       p_pool->p_tail = p_unit->p_next;
     }
+    pthread_mutex_unlock(&p_pool->lock);
 
   } else {
 
@@ -286,6 +314,7 @@ void pool_push_1(ABT_pool pool, ABT_unit unit, ABT_pool_context c) {
   ABT_pool_get_data(pool, (void **)&p_pool);
   unit_t *p_unit = (unit_t *)unit;
 
+    pthread_mutex_lock(&p_pool->lock);
   if (p_pool->p_tail) {
     p_unit->p_next = p_pool->p_tail;
     p_pool->p_tail->p_prev = p_unit;
@@ -293,6 +322,7 @@ void pool_push_1(ABT_pool pool, ABT_unit unit, ABT_pool_context c) {
     p_pool->p_head = p_unit;
   }
   p_pool->p_tail = p_unit;
+    pthread_mutex_unlock(&p_pool->lock);
 }
 
 int pool_init_1(ABT_pool pool, ABT_pool_config config) {

@@ -14,30 +14,51 @@ rm *.op
 APP=$1
 
 echo "App: " $APP
-THREADS=4
-
-#for i in {1..5}
-#do
-#	ARGOLIB_WORKERS=$THREADS ./$APP > $APP_op_$i.op
-#done
+THREADS=20
 
 for i in {1..5}
 do
-	FILE_NAME=$APP_op_$i.op
-	echo "Op file: " $FILE_NAME
-	ARGOLIB_WORKERS=$THREADS ./$APP > $FILE_NAME
+	FILE="${APP}_latency_${i}.op"
+	ARGOLIB_WORKERS=$THREADS ./$APP > $FILE 2>&1
+	echo $FILE
+done
+
+LAT_FILE="${APP}_latency.csv"
+
+touch $LAT_FILE
+
+echo "latency" > $LAT_FILE
+
+for i in {1..5}
+do
+	FILE="${APP}_latency_${i}.op"
+        grep ARGOLIB_ELAPSEDTIME $FILE | awk '{print $2}' >> $LAT_FILE
+	echo "Collected from $FILE"
 done
 
 
-OP_FILE=$APP_task.csv
+## Task Count
+
+
+for i in 2 4 8 16 20
+do
+	FILE=${APP}_task_${i}.op
+	touch $FILE
+	ARGOLIB_WORKERS=$i ./$APP >> $FILE
+done
+
+
+OP_FILE=${APP}_task.csv
 
 echo "TaskCnt dumping in " $OP_FILE
 touch $OP_FILE
 echo "threads,ratio" > $OP_FILE
 
-for i in {1..5}
+for i in 2 4 8 16 20
 do
-	grep ARGOLIB_TOTPOOLCNT $_op_$i.op | awk '{print $3","$9}' >> $OP_FILE
+	FILE=${APP}_task_${i}.op
+	grep ARGOLIB_TOTPOOLCNT $FILE | awk '{print $3","$9}' >> $OP_FILE
+	echo "Collected from $FILE"
 done
 
-python3 task_plot.py $APP_task.csv $APP
+#python3 task_plot.py $APP_task.csv $APP
