@@ -107,8 +107,6 @@ template <typename T> inline argolib_task_t *allocate_task(T *lambda) {
   return initialize_task(call_lambda<T>, lambda_on_heap);
 }
 
-
-
 /**
  * C++ equivalent of the argolib_kernel API. User lambda passed instead of
  * function pointer and args.
@@ -116,8 +114,8 @@ template <typename T> inline argolib_task_t *allocate_task(T *lambda) {
  */
 template <typename T> void kernel(T &&lambda) {
   typedef typename std::remove_reference<T>::type U;
-  //argolib_task_t *task = allocate_task(new U(lambda));
-  argolib_task_t* task = initialize_task(call_lambda<U>, new U(lambda));  
+  // argolib_task_t *task = allocate_task(new U(lambda));
+  argolib_task_t *task = initialize_task(call_lambda<U>, new U(lambda));
   fork_t fptr = (fork_t)((task->_fp));
   void *args = task->args;
   argolib_kernel(fptr, args);
@@ -129,7 +127,7 @@ template <typename T> void kernel(T &&lambda) {
  */
 template <typename T> Task_handle *fork(T &&lambda) {
   typedef typename std::remove_reference<T>::type U;
-  //argolib_task_t *task = allocate_task(new U(lambda));
+  // argolib_task_t *task = allocate_task(new U(lambda));
   argolib_task_t *task = initialize_task(call_lambda<U>, new U(lambda));
   fork_t fptr = (fork_t)((task->_fp));
   void *args = task->args;

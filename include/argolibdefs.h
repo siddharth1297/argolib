@@ -6,9 +6,9 @@
 
 #include <assert.h>
 #include <pthread.h>
+#include <sched.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sched.h>
 
 #include "abt.h"
 
