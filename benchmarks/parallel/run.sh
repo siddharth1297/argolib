@@ -8,13 +8,12 @@ if [ "$#" -ne 1 ]; then
     exit 1
 fi
 
-rm *.csv
-rm *.op
+#rm *.csv *.op > /dev/null 2>&1
 
 APP=$1
 
 echo "App: " $APP
-THREADS=20
+THREADS=4
 
 for i in {1..5}
 do
@@ -36,15 +35,16 @@ do
 	echo "Collected from $FILE"
 done
 
-
 ## Task Count
 
-
-for i in 2 4 8 16 20
+cnt=1
+#for i in 2 4 8 16 20
+for i in 1 2 3 4
 do
-	FILE=${APP}_task_${i}.op
+	FILE="${APP}_task_${i}.op"
 	touch $FILE
 	ARGOLIB_WORKERS=$i ./$APP >> $FILE
+	cnt=$((cnt+1))
 done
 
 
@@ -54,9 +54,9 @@ echo "TaskCnt dumping in " $OP_FILE
 touch $OP_FILE
 echo "threads,ratio" > $OP_FILE
 
-for i in 2 4 8 16 20
+for i in {1..4}
 do
-	FILE=${APP}_task_${i}.op
+	FILE="${APP}_task_${i}.op"
 	grep ARGOLIB_TOTPOOLCNT $FILE | awk '{print $3","$9}' >> $OP_FILE
 	echo "Collected from $FILE"
 done
