@@ -43,7 +43,7 @@ cnt=1
 for i in 2 4 8 16 20
 #for i in 1 2 3 4
 do
-	FILE="${APP}_task_${i}.op"
+	FILE="${APP}_task_${cnt}.op"
 	touch $FILE
 	ARGOLIB_WORKERS=$i ./$APP >> $FILE
 	cnt=$((cnt+1))
