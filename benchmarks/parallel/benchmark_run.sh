@@ -2,6 +2,7 @@
 
 source export.env
 
+ulimit -c unlimited
 echo $PWD
 
 rm *.op *.csv > /dev/null 2>&1
