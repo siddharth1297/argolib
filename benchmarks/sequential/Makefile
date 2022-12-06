@@ -1,4 +1,4 @@
-TARGETS := fib array_sum qsort iterative
+TARGETS := fib qsort
 
 all: clean $(TARGETS) clean-obj
 
