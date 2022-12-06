@@ -1,5 +1,7 @@
 #!/bin/bash
 
+ulimit -c unlimited
+
 USAGE="./run {executable}"
 
 if [ "$#" -ne 1 ]; then
@@ -21,6 +23,7 @@ do
 	touch $FILE
 	ARGOLIB_WORKERS=$THREADS ./$APP > $FILE 2>&1
 	echo $FILE
+	sleep 3
 done
 
 LAT_FILE="${APP}_par_latency.csv"
@@ -46,6 +49,7 @@ do
 	touch $FILE
 	ARGOLIB_WORKERS=$i ./$APP >> $FILE
 	cnt=$((cnt+1))
+	sleep 3
 done
 
 

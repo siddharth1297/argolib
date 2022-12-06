@@ -17,13 +17,13 @@ cp sequential/*_seq_latency.csv .
 cp parallel/*_par_latency.csv .
 cp parallel/*_task.csv .
 
-for i in fib qsort iterative array_sum
+for i in fib qsort
 do
         python3 latency_graph.py "${i}_seq_latency.csv" "${i}_par_latency.csv" "${i}_lat.jpeg"
 done
 
 
-for i in fib qsort iterative array_sum
+for i in fib qsort
 do
 	python3 task_plot.py "${i}_task.csv" "${i}_task.jpeg"
 done
