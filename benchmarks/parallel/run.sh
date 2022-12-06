@@ -17,12 +17,12 @@ THREADS=4
 
 for i in {1..5}
 do
-	FILE="${APP}_latency_${i}.op"
+	FILE="${APP}_par_latency_${i}.op"
 	ARGOLIB_WORKERS=$THREADS ./$APP > $FILE 2>&1
 	echo $FILE
 done
 
-LAT_FILE="${APP}_latency.csv"
+LAT_FILE="${APP}_par_latency.csv"
 
 touch $LAT_FILE
 
@@ -30,7 +30,7 @@ echo "latency" > $LAT_FILE
 
 for i in {1..5}
 do
-	FILE="${APP}_latency_${i}.op"
+	FILE="${APP}_par_latency_${i}.op"
         grep ARGOLIB_ELAPSEDTIME $FILE | awk '{print $2}' >> $LAT_FILE
 	echo "Collected from $FILE"
 done
