@@ -13,7 +13,7 @@ fi
 APP=$1
 
 echo "App: " $APP
-THREADS=4
+THREADS=20
 
 for i in {1..5}
 do

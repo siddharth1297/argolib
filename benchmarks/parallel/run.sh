@@ -13,11 +13,12 @@ fi
 APP=$1
 
 echo "App: " $APP
-THREADS=4
+THREADS=20
 
 for i in {1..5}
 do
 	FILE="${APP}_par_latency_${i}.op"
+	touch $FILE
 	ARGOLIB_WORKERS=$THREADS ./$APP > $FILE 2>&1
 	echo $FILE
 done
@@ -38,8 +39,8 @@ done
 ## Task Count
 
 cnt=1
-#for i in 2 4 8 16 20
-for i in 1 2 3 4
+for i in 2 4 8 16 20
+#for i in 1 2 3 4
 do
 	FILE="${APP}_task_${i}.op"
 	touch $FILE
@@ -48,17 +49,15 @@ do
 done
 
 
-OP_FILE=${APP}_task.csv
+OP_FILE="${APP}_task.csv"
 
 echo "TaskCnt dumping in " $OP_FILE
 touch $OP_FILE
 echo "threads,ratio" > $OP_FILE
 
-for i in {1..4}
+for i in {1..5}
 do
 	FILE="${APP}_task_${i}.op"
 	grep ARGOLIB_TOTPOOLCNT $FILE | awk '{print $3","$9}' >> $OP_FILE
 	echo "Collected from $FILE"
 done
-
-#python3 task_plot.py $APP_task.csv $APP

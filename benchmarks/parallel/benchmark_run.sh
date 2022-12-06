@@ -2,6 +2,8 @@
 
 source export.env
 
+echo $PWD
+
 rm *.op *.csv > /dev/null 2>&1
 for i in fib qsort array_sum iterative  
 do
