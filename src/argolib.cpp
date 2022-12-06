@@ -59,6 +59,8 @@ void *daemon_profiler(void *arg) {
 
   double JPI_prev = 0;
 
+  double start_time = ABT_get_wtime();
+  printf("ARGOLIB_DAEMON_START time %f\n", start_time*1.0e3);
   while (finish == 0) {
 
     ___after_sstate = pcm::getSystemCounterState();
@@ -76,7 +78,7 @@ void *daemon_profiler(void *arg) {
 }
 
 void configure_DOP(double JPI_prev, double JPI_curr) {
-
+  double curTime = ABT_get_wtime();
   int wchange = 0;
 
   if (first_configureDOP == 1) {
@@ -86,6 +88,8 @@ void configure_DOP(double JPI_prev, double JPI_curr) {
     wchange = wactive / 2;
     sleep_argolib_workers(wchange);
     wactive = wchange;
+    printf("ARGOLIB_POWER Prev %0.8f Cur %0.8f change %d mode sleep active %d curTime %f action %d point %d\n",
+		    JPI_prev, JPI_curr, wchange, wactive, curTime*1.0e3, lastAction, 1);
     lastAction = 0;
     return;
   }
@@ -100,6 +104,8 @@ void configure_DOP(double JPI_prev, double JPI_curr) {
       wactive -= wchange;
 
       sleep_argolib_workers(wchange);
+      printf("ARGOLIB_POWER Prev %0.8f Cur %0.8f change %d mode sleep active %d curTime %f action %d point %d\n",
+                    JPI_prev, JPI_curr, wchange, wactive, curTime*1.0e3, lastAction, 2);
     }
 
     else {
@@ -109,6 +115,8 @@ void configure_DOP(double JPI_prev, double JPI_curr) {
         return;
       wactive += wchange;
       awake_argolib_workers(wchange);
+      printf("ARGOLIB_POWER Prev %0.8f Cur %0.8f change %d mode awake active %d curTime %f action %d point %d\n",
+                    JPI_prev, JPI_curr, wchange, wactive, curTime*1.0e3, lastAction, 3);
     }
   }
 
@@ -121,6 +129,8 @@ void configure_DOP(double JPI_prev, double JPI_curr) {
       wactive += wchange;
       awake_argolib_workers(wchange);
       lastAction = 1;
+      printf("ARGOLIB_POWER Prev %0.8f Cur %0.8f change %d mode awake active %d curTime %f action %d point %d\n",
+                    JPI_prev, JPI_curr, wchange, wactive, curTime*1.0e3, lastAction, 4);
     }
 
     else {
@@ -131,6 +141,8 @@ void configure_DOP(double JPI_prev, double JPI_curr) {
       wactive -= wchange;
       sleep_argolib_workers(wchange);
       lastAction = 0;
+      printf("ARGOLIB_POWER Prev %0.8f Cur %0.8f change %d mode sleep active %d curTime %f action %d point %d\n",
+                    JPI_prev, JPI_curr, wchange, wactive, curTime*1.0e3, lastAction, 5);
     }
   }
 }
